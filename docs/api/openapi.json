@@ -1,0 +1,868 @@
+{
+ "openapi": "3.1.0",
+ "info": {
+  "title": "Photo → Maths gateway (factice)",
+  "version": "1.0"
+ },
+ "paths": {
+  "/health": {
+   "get": {
+    "summary": "Health",
+    "operationId": "health_health_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Health"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/solve": {
+   "post": {
+    "summary": "Solve",
+    "operationId": "solve_v1_solve_post",
+    "parameters": [
+     {
+      "name": "x-mock-scenario",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "type": "string",
+       "default": "ok",
+       "title": "X-Mock-Scenario"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/SolveRequest"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/SolveResponse"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/explain": {
+   "post": {
+    "summary": "Explain",
+    "operationId": "explain_v1_explain_post",
+    "parameters": [
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ExplainRequest"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ExplainResponse"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ "components": {
+  "schemas": {
+   "ClientInfo": {
+    "properties": {
+     "platform": {
+      "type": "string",
+      "enum": [
+       "android",
+       "ios",
+       "desktop",
+       "web",
+       "test"
+      ],
+      "title": "Platform",
+      "default": "test"
+     },
+     "app_version": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "App Version"
+     },
+     "mode": {
+      "type": "string",
+      "enum": [
+       "complet",
+       "leger"
+      ],
+      "title": "Mode",
+      "default": "complet"
+     }
+    },
+    "type": "object",
+    "title": "ClientInfo"
+   },
+   "Code": {
+    "properties": {
+     "language": {
+      "type": "string",
+      "const": "python",
+      "title": "Language",
+      "default": "python"
+     },
+     "source": {
+      "type": "string",
+      "title": "Source",
+      "description": "Exactement le code exécuté, autonome (imports inclus), finit par print(result)"
+     },
+     "stdout": {
+      "type": "string",
+      "title": "Stdout",
+      "default": ""
+     },
+     "status": {
+      "type": "string",
+      "enum": [
+       "ok",
+       "error",
+       "timeout",
+       "rejected",
+       "no_result"
+      ],
+      "title": "Status"
+     },
+     "exec_ms": {
+      "type": "number",
+      "title": "Exec Ms"
+     },
+     "attempts": {
+      "type": "integer",
+      "title": "Attempts",
+      "description": "1 + nombre d'auto-corrections",
+      "default": 1
+     }
+    },
+    "type": "object",
+    "required": [
+     "source",
+     "status",
+     "exec_ms"
+    ],
+    "title": "Code"
+   },
+   "ErrorCode": {
+    "type": "string",
+    "enum": [
+     "parse_error",
+     "unsupported_type",
+     "image_not_supported",
+     "code_failed",
+     "timeout",
+     "answer_mismatch",
+     "llm_unavailable"
+    ],
+    "title": "ErrorCode",
+    "description": "Échec côté serveur : le client affiche un message et propose de corriger le LaTeX."
+   },
+   "ErrorInfo": {
+    "properties": {
+     "code": {
+      "$ref": "#/components/schemas/ErrorCode"
+     },
+     "message": {
+      "type": "string",
+      "title": "Message"
+     }
+    },
+    "type": "object",
+    "required": [
+     "code",
+     "message"
+    ],
+    "title": "ErrorInfo"
+   },
+   "Escalation": {
+    "properties": {
+     "reason": {
+      "$ref": "#/components/schemas/EscalationReason"
+     },
+     "detail": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Detail",
+      "description": "Ex. confiance OCR 0.42, message d'erreur local"
+     },
+     "ocr_confidence": {
+      "anyOf": [
+       {
+        "type": "number",
+        "maximum": 1.0,
+        "minimum": 0.0
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Ocr Confidence"
+     }
+    },
+    "type": "object",
+    "required": [
+     "reason"
+    ],
+    "title": "Escalation"
+   },
+   "EscalationReason": {
+    "type": "string",
+    "enum": [
+     "ocr_low_confidence",
+     "invalid_latex",
+     "out_of_local_scope",
+     "local_code_failed",
+     "device_too_weak",
+     "user_request"
+    ],
+    "title": "EscalationReason",
+    "description": "Pourquoi le client a envoyé la requête au serveur (section « Escalade vers le serveur »)."
+   },
+   "ExplainRequest": {
+    "properties": {
+     "problem": {
+      "$ref": "#/components/schemas/Problem"
+     },
+     "steps": {
+      "items": {
+       "$ref": "#/components/schemas/Step"
+      },
+      "type": "array",
+      "title": "Steps"
+     },
+     "result": {
+      "$ref": "#/components/schemas/Result"
+     },
+     "level": {
+      "$ref": "#/components/schemas/Level",
+      "default": "lycee"
+     }
+    },
+    "type": "object",
+    "required": [
+     "problem",
+     "steps",
+     "result"
+    ],
+    "title": "ExplainRequest",
+    "description": "Mode léger : le client sans LLM local demande l'explication au serveur."
+   },
+   "ExplainResponse": {
+    "properties": {
+     "api_version": {
+      "type": "string",
+      "title": "Api Version",
+      "default": "1.0"
+     },
+     "request_id": {
+      "type": "string",
+      "title": "Request Id"
+     },
+     "explanation": {
+      "$ref": "#/components/schemas/Explanation"
+     },
+     "models": {
+      "$ref": "#/components/schemas/ModelInfo",
+      "default": {}
+     }
+    },
+    "type": "object",
+    "required": [
+     "request_id",
+     "explanation"
+    ],
+    "title": "ExplainResponse"
+   },
+   "Explanation": {
+    "properties": {
+     "level": {
+      "$ref": "#/components/schemas/Level"
+     },
+     "text_fr": {
+      "type": "string",
+      "title": "Text Fr",
+      "description": "Markdown avec formules LaTeX entre $...$"
+     },
+     "faithfulness": {
+      "type": "number",
+      "maximum": 1.0,
+      "minimum": 0.0,
+      "title": "Faithfulness",
+      "description": "Part des égalités vérifiées par SymPy"
+     }
+    },
+    "type": "object",
+    "required": [
+     "level",
+     "text_fr",
+     "faithfulness"
+    ],
+    "title": "Explanation"
+   },
+   "HTTPValidationError": {
+    "properties": {
+     "detail": {
+      "items": {
+       "$ref": "#/components/schemas/ValidationError"
+      },
+      "type": "array",
+      "title": "Detail"
+     }
+    },
+    "type": "object",
+    "title": "HTTPValidationError"
+   },
+   "Health": {
+    "properties": {
+     "status": {
+      "type": "string",
+      "enum": [
+       "ok",
+       "degraded"
+      ],
+      "title": "Status"
+     },
+     "api_version": {
+      "type": "string",
+      "title": "Api Version",
+      "default": "1.0"
+     },
+     "mock": {
+      "type": "boolean",
+      "title": "Mock",
+      "default": false
+     },
+     "llm": {
+      "anyOf": [
+       {
+        "type": "boolean"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Llm"
+     }
+    },
+    "type": "object",
+    "required": [
+     "status"
+    ],
+    "title": "Health"
+   },
+   "Level": {
+    "type": "string",
+    "enum": [
+     "college",
+     "lycee",
+     "superieur"
+    ],
+    "title": "Level"
+   },
+   "ModelInfo": {
+    "properties": {
+     "code_model": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Code Model"
+     },
+     "code_model_version": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Code Model Version"
+     },
+     "explain_model": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Explain Model"
+     }
+    },
+    "type": "object",
+    "title": "ModelInfo"
+   },
+   "Problem": {
+    "properties": {
+     "latex": {
+      "type": "string",
+      "title": "Latex"
+     },
+     "type": {
+      "$ref": "#/components/schemas/ProblemType"
+     },
+     "variables": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Variables"
+     },
+     "route": {
+      "type": "string",
+      "enum": [
+       "local",
+       "server"
+      ],
+      "title": "Route",
+      "description": "Où ce type de problème est censé être traité"
+     }
+    },
+    "type": "object",
+    "required": [
+     "latex",
+     "type",
+     "variables",
+     "route"
+    ],
+    "title": "Problem"
+   },
+   "ProblemType": {
+    "type": "string",
+    "enum": [
+     "equation",
+     "system",
+     "derivative",
+     "integral",
+     "limit"
+    ],
+    "title": "ProblemType"
+   },
+   "Result": {
+    "properties": {
+     "latex": {
+      "type": "string",
+      "title": "Latex",
+      "examples": [
+       "x \\in \\left\\{2 ; 3\\right\\}"
+      ]
+     },
+     "sympy": {
+      "type": "string",
+      "title": "Sympy",
+      "description": "Valeur SymPy sérialisée (str)",
+      "examples": [
+       "[2, 3]"
+      ]
+     },
+     "verified": {
+      "type": "boolean",
+      "title": "Verified",
+      "description": "Le code exécuté et SymPy donnent le même résultat"
+     }
+    },
+    "type": "object",
+    "required": [
+     "latex",
+     "sympy",
+     "verified"
+    ],
+    "title": "Result"
+   },
+   "SolveRequest": {
+    "properties": {
+     "latex": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 2000
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Latex",
+      "examples": [
+       "x^{2} - 5 x + 6 = 0"
+      ]
+     },
+     "image_base64": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Image Base64",
+      "description": "JPEG/PNG en base64 (OCR serveur)"
+     },
+     "type_hint": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/ProblemType"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "want_code": {
+      "type": "boolean",
+      "title": "Want Code",
+      "description": "true pour l'ordinateur : renvoie le code exécuté",
+      "default": false
+     },
+     "escalation": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/Escalation"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "client": {
+      "$ref": "#/components/schemas/ClientInfo",
+      "default": {
+       "platform": "test",
+       "mode": "complet"
+      }
+     }
+    },
+    "type": "object",
+    "title": "SolveRequest"
+   },
+   "SolveResponse": {
+    "properties": {
+     "api_version": {
+      "type": "string",
+      "title": "Api Version",
+      "default": "1.0"
+     },
+     "request_id": {
+      "type": "string",
+      "title": "Request Id"
+     },
+     "status": {
+      "type": "string",
+      "enum": [
+       "ok",
+       "unverified",
+       "error"
+      ],
+      "title": "Status",
+      "description": "ok : résultat vérifié ; unverified : résultat SymPy sans confirmation du code (afficher un avertissement) ; error : voir `error`"
+     },
+     "problem": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/Problem"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "result": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/Result"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "steps": {
+      "items": {
+       "$ref": "#/components/schemas/Step"
+      },
+      "type": "array",
+      "title": "Steps",
+      "default": []
+     },
+     "code": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/Code"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "explanation": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/Explanation"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "escalation": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/Escalation"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Raison d'escalade reçue du client, renvoyée telle quelle"
+     },
+     "error": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/ErrorInfo"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "models": {
+      "$ref": "#/components/schemas/ModelInfo",
+      "default": {}
+     },
+     "timings": {
+      "$ref": "#/components/schemas/Timings",
+      "default": {
+       "ocr_ms": 0.0,
+       "parse_ms": 0.0,
+       "llm_ms": 0.0,
+       "sandbox_ms": 0.0,
+       "total_ms": 0.0
+      }
+     },
+     "graph": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Graph",
+      "description": "Réservé : tracé de fonction (SVG ou points)"
+     }
+    },
+    "type": "object",
+    "required": [
+     "request_id",
+     "status"
+    ],
+    "title": "SolveResponse"
+   },
+   "Step": {
+    "properties": {
+     "index": {
+      "type": "integer",
+      "title": "Index"
+     },
+     "text_fr": {
+      "type": "string",
+      "title": "Text Fr"
+     },
+     "latex": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Latex"
+     }
+    },
+    "type": "object",
+    "required": [
+     "index",
+     "text_fr"
+    ],
+    "title": "Step"
+   },
+   "Timings": {
+    "properties": {
+     "ocr_ms": {
+      "type": "number",
+      "title": "Ocr Ms",
+      "default": 0
+     },
+     "parse_ms": {
+      "type": "number",
+      "title": "Parse Ms",
+      "default": 0
+     },
+     "llm_ms": {
+      "type": "number",
+      "title": "Llm Ms",
+      "default": 0
+     },
+     "sandbox_ms": {
+      "type": "number",
+      "title": "Sandbox Ms",
+      "default": 0
+     },
+     "total_ms": {
+      "type": "number",
+      "title": "Total Ms",
+      "default": 0
+     }
+    },
+    "type": "object",
+    "title": "Timings"
+   },
+   "ValidationError": {
+    "properties": {
+     "loc": {
+      "items": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "integer"
+        }
+       ]
+      },
+      "type": "array",
+      "title": "Location"
+     },
+     "msg": {
+      "type": "string",
+      "title": "Message"
+     },
+     "type": {
+      "type": "string",
+      "title": "Error Type"
+     },
+     "input": {
+      "title": "Input"
+     },
+     "ctx": {
+      "type": "object",
+      "title": "Context"
+     }
+    },
+    "type": "object",
+    "required": [
+     "loc",
+     "msg",
+     "type"
+    ],
+    "title": "ValidationError"
+   }
+  }
+ }
+}

@@ -1,0 +1,11 @@
+{
+ "latex": "2 x^{2} - 3 x - 5 = 0",
+ "want_code": true,
+ "escalation": {
+  "reason": "out_of_local_scope"
+ },
+ "client": {
+  "platform": "android",
+  "mode": "complet"
+ }
+}

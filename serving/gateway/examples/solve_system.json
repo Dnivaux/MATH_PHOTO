@@ -1,0 +1,59 @@
+{
+ "api_version": "1.0",
+ "request_id": "exemple-system",
+ "status": "ok",
+ "problem": {
+  "latex": "\\begin{cases} 2 x + y = 5 \\\\ x - y = 1 \\end{cases}",
+  "type": "system",
+  "variables": [
+   "x",
+   "y"
+  ],
+  "route": "server"
+ },
+ "result": {
+  "latex": "x = 2, \\; y = 1",
+  "sympy": "{x: 2, y: 1}",
+  "verified": true
+ },
+ "steps": [
+  {
+   "index": 1,
+   "text_fr": "Valeur de x.",
+   "latex": "x = 2"
+  },
+  {
+   "index": 2,
+   "text_fr": "Valeur de y.",
+   "latex": "y = 1"
+  }
+ ],
+ "code": {
+  "language": "python",
+  "source": "# Code de référence (exemple)\nfrom sympy import *\nx, y = symbols('x y')\nresult = solve([Eq(2*x + y, 5), Eq(x - y, 1)], [x, y], dict=True)[0]\nprint(result)",
+  "stdout": "{x: 2, y: 1}\n",
+  "status": "ok",
+  "exec_ms": 147.23735699953977,
+  "attempts": 1
+ },
+ "explanation": null,
+ "escalation": {
+  "reason": "out_of_local_scope",
+  "detail": null,
+  "ocr_confidence": null
+ },
+ "error": null,
+ "models": {
+  "code_model": null,
+  "code_model_version": null,
+  "explain_model": null
+ },
+ "timings": {
+  "ocr_ms": 0.0,
+  "parse_ms": 4.990654997527599,
+  "llm_ms": 0.0009650029824115336,
+  "sandbox_ms": 147.23735699953977,
+  "total_ms": 152.43846100202063
+ },
+ "graph": null
+}

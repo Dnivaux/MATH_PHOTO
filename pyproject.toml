@@ -1,0 +1,51 @@
+[project]
+name = "photo-maths"
+version = "0.1.0"
+description = "Solveur de maths : génération SymPy, évaluation, distillation, serveur et OCR"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "sympy>=1.14",
+    "lark>=1.2",
+    "antlr4-python3-runtime==4.11.*",  # parseur LaTeX de SymPy (backend par défaut)
+    "pydantic>=2.8",
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+    "httpx>=0.27",
+    "openai>=1.50",
+    "mlflow>=3.4",
+    "boto3>=1.34",
+    "python-dotenv>=1.0",
+    "tqdm>=4.66",
+]
+
+[project.optional-dependencies]
+# Tout le GPU dans une seule résolution, pour que vllm et trl s'accordent sur torch/transformers.
+gpu = [
+    "vllm>=0.11",
+    "transformers>=4.56",
+    "trl>=0.23",
+    "peft>=0.17",
+    "bitsandbytes>=0.46",
+    "accelerate>=1.10",
+    "datasets>=3.0",
+]
+dev = ["pytest>=8", "ruff>=0.6"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["common*", "datagen*", "eval*", "training*", "serving*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 180
+exclude = ["third_party"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "B"]
+# B023 : lambdas appelées immédiatement dans la boucle ; B008 : Depends() de FastAPI ; B905 : zip sur listes de même taille
+ignore = ["E731", "E741", "B008", "B023", "B905", "B007"]

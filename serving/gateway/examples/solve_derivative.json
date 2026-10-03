@@ -1,0 +1,58 @@
+{
+ "api_version": "1.0",
+ "request_id": "exemple-derivative",
+ "status": "ok",
+ "problem": {
+  "latex": "\\frac{d}{dx}\\left(x^{2} \\sin{\\left(x \\right)}\\right)",
+  "type": "derivative",
+  "variables": [
+   "x"
+  ],
+  "route": "server"
+ },
+ "result": {
+  "latex": "f'(x) = x^{2} \\cos{\\left(x \\right)} + 2 x \\sin{\\left(x \\right)}",
+  "sympy": "x**2*cos(x) + 2*x*sin(x)",
+  "verified": true
+ },
+ "steps": [
+  {
+   "index": 1,
+   "text_fr": "Dérivée d'un produit : (uv)' = u'v + uv' avec u = x^{2} et v = \\sin{\\left(x \\right)}.",
+   "latex": "\\frac{d}{dx}\\left(x^{2} \\sin{\\left(x \\right)}\\right) = \\left((2 x) (\\sin{\\left(x \\right)}) + (x^{2}) (\\cos{\\left(x \\right)})\\right) = x^{2} \\cos{\\left(x \\right)} + 2 x \\sin{\\left(x \\right)}"
+  },
+  {
+   "index": 2,
+   "text_fr": "On rassemble les termes.",
+   "latex": "f'(x) = x^{2} \\cos{\\left(x \\right)} + 2 x \\sin{\\left(x \\right)}"
+  }
+ ],
+ "code": {
+  "language": "python",
+  "source": "# Code de référence (exemple)\nfrom sympy import *\nx = symbols('x')\nresult = diff(x**2*sin(x), x)\nprint(result)",
+  "stdout": "x**2*cos(x) + 2*x*sin(x)\n",
+  "status": "ok",
+  "exec_ms": 148.34821700060274,
+  "attempts": 1
+ },
+ "explanation": null,
+ "escalation": {
+  "reason": "out_of_local_scope",
+  "detail": null,
+  "ocr_confidence": null
+ },
+ "error": null,
+ "models": {
+  "code_model": null,
+  "code_model_version": null,
+  "explain_model": null
+ },
+ "timings": {
+  "ocr_ms": 0.0,
+  "parse_ms": 6.074621000152547,
+  "llm_ms": 0.0005830006557516754,
+  "sandbox_ms": 148.34821700060274,
+  "total_ms": 154.59376600119867
+ },
+ "graph": null
+}

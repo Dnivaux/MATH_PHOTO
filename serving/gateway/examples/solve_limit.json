@@ -1,0 +1,53 @@
+{
+ "api_version": "1.0",
+ "request_id": "exemple-limit",
+ "status": "ok",
+ "problem": {
+  "latex": "\\lim_{x \\to 0} \\frac{\\sin(3 x)}{x}",
+  "type": "limit",
+  "variables": [
+   "x"
+  ],
+  "route": "server"
+ },
+ "result": {
+  "latex": "3",
+  "sympy": "3",
+  "verified": true
+ },
+ "steps": [
+  {
+   "index": 1,
+   "text_fr": "Calcul de la limite par SymPy.",
+   "latex": "\\lim_{x \\to 0} \\frac{\\sin(3 x)}{x} = 3"
+  }
+ ],
+ "code": {
+  "language": "python",
+  "source": "# Code de référence (exemple)\nfrom sympy import *\nx = symbols('x')\nresult = limit(sin(3*x)/x, x, 0)\nprint(result)",
+  "stdout": "3\n",
+  "status": "ok",
+  "exec_ms": 142.33737800168456,
+  "attempts": 1
+ },
+ "explanation": null,
+ "escalation": {
+  "reason": "out_of_local_scope",
+  "detail": null,
+  "ocr_confidence": null
+ },
+ "error": null,
+ "models": {
+  "code_model": null,
+  "code_model_version": null,
+  "explain_model": null
+ },
+ "timings": {
+  "ocr_ms": 0.0,
+  "parse_ms": 3.943691001040861,
+  "llm_ms": 0.0006330010364763439,
+  "sandbox_ms": 142.33737800168456,
+  "total_ms": 146.4428590006719
+ },
+ "graph": null
+}

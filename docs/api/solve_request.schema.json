@@ -1,0 +1,175 @@
+{
+ "$defs": {
+  "ClientInfo": {
+   "properties": {
+    "platform": {
+     "default": "test",
+     "enum": [
+      "android",
+      "ios",
+      "desktop",
+      "web",
+      "test"
+     ],
+     "title": "Platform",
+     "type": "string"
+    },
+    "app_version": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "App Version"
+    },
+    "mode": {
+     "default": "complet",
+     "enum": [
+      "complet",
+      "leger"
+     ],
+     "title": "Mode",
+     "type": "string"
+    }
+   },
+   "title": "ClientInfo",
+   "type": "object"
+  },
+  "Escalation": {
+   "properties": {
+    "reason": {
+     "$ref": "#/$defs/EscalationReason"
+    },
+    "detail": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "Ex. confiance OCR 0.42, message d'erreur local",
+     "title": "Detail"
+    },
+    "ocr_confidence": {
+     "anyOf": [
+      {
+       "maximum": 1,
+       "minimum": 0,
+       "type": "number"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Ocr Confidence"
+    }
+   },
+   "required": [
+    "reason"
+   ],
+   "title": "Escalation",
+   "type": "object"
+  },
+  "EscalationReason": {
+   "description": "Pourquoi le client a envoyé la requête au serveur (section « Escalade vers le serveur »).",
+   "enum": [
+    "ocr_low_confidence",
+    "invalid_latex",
+    "out_of_local_scope",
+    "local_code_failed",
+    "device_too_weak",
+    "user_request"
+   ],
+   "title": "EscalationReason",
+   "type": "string"
+  },
+  "ProblemType": {
+   "enum": [
+    "equation",
+    "system",
+    "derivative",
+    "integral",
+    "limit"
+   ],
+   "title": "ProblemType",
+   "type": "string"
+  }
+ },
+ "properties": {
+  "latex": {
+   "anyOf": [
+    {
+     "maxLength": 2000,
+     "type": "string"
+    },
+    {
+     "type": "null"
+    }
+   ],
+   "default": null,
+   "examples": [
+    "x^{2} - 5 x + 6 = 0"
+   ],
+   "title": "Latex"
+  },
+  "image_base64": {
+   "anyOf": [
+    {
+     "type": "string"
+    },
+    {
+     "type": "null"
+    }
+   ],
+   "default": null,
+   "description": "JPEG/PNG en base64 (OCR serveur)",
+   "title": "Image Base64"
+  },
+  "type_hint": {
+   "anyOf": [
+    {
+     "$ref": "#/$defs/ProblemType"
+    },
+    {
+     "type": "null"
+    }
+   ],
+   "default": null
+  },
+  "want_code": {
+   "default": false,
+   "description": "true pour l'ordinateur : renvoie le code exécuté",
+   "title": "Want Code",
+   "type": "boolean"
+  },
+  "escalation": {
+   "anyOf": [
+    {
+     "$ref": "#/$defs/Escalation"
+    },
+    {
+     "type": "null"
+    }
+   ],
+   "default": null
+  },
+  "client": {
+   "$ref": "#/$defs/ClientInfo",
+   "default": {
+    "platform": "test",
+    "app_version": null,
+    "mode": "complet"
+   }
+  }
+ },
+ "title": "SolveRequest",
+ "type": "object"
+}

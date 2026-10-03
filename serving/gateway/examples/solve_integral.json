@@ -1,0 +1,63 @@
+{
+ "api_version": "1.0",
+ "request_id": "exemple-integral",
+ "status": "ok",
+ "problem": {
+  "latex": "\\int \\left(x e^{x}\\right) dx",
+  "type": "integral",
+  "variables": [
+   "x"
+  ],
+  "route": "server"
+ },
+ "result": {
+  "latex": "F(x) = \\left(x - 1\\right) e^{x} + C",
+  "sympy": "(x - 1)*exp(x)",
+  "verified": true
+ },
+ "steps": [
+  {
+   "index": 1,
+   "text_fr": "Par linéarité, on cherche une primitive de chaque terme.",
+   "latex": null
+  },
+  {
+   "index": 2,
+   "text_fr": "Terme $x e^{x}$ (par parties).",
+   "latex": "\\int x e^{x} \\, dx = \\left(x - 1\\right) e^{x} + C"
+  },
+  {
+   "index": 3,
+   "text_fr": "On additionne les primitives.",
+   "latex": "F(x) = \\left(x - 1\\right) e^{x} + C"
+  }
+ ],
+ "code": {
+  "language": "python",
+  "source": "# Code de référence (exemple)\nfrom sympy import *\nx = symbols('x')\nresult = integrate(x*exp(x), x)\nprint(result)",
+  "stdout": "(x - 1)*exp(x)\n",
+  "status": "ok",
+  "exec_ms": 201.89570399816148,
+  "attempts": 1
+ },
+ "explanation": null,
+ "escalation": {
+  "reason": "out_of_local_scope",
+  "detail": null,
+  "ocr_confidence": null
+ },
+ "error": null,
+ "models": {
+  "code_model": null,
+  "code_model_version": null,
+  "explain_model": null
+ },
+ "timings": {
+  "ocr_ms": 0.0,
+  "parse_ms": 32.48291099953349,
+  "llm_ms": 0.0006020018190611154,
+  "sandbox_ms": 201.89570399816148,
+  "total_ms": 234.54242099978728
+ },
+ "graph": null
+}

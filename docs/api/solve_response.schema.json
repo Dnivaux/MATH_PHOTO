@@ -1,0 +1,484 @@
+{
+ "$defs": {
+  "Code": {
+   "properties": {
+    "language": {
+     "const": "python",
+     "default": "python",
+     "title": "Language",
+     "type": "string"
+    },
+    "source": {
+     "description": "Exactement le code exécuté, autonome (imports inclus), finit par print(result)",
+     "title": "Source",
+     "type": "string"
+    },
+    "stdout": {
+     "default": "",
+     "title": "Stdout",
+     "type": "string"
+    },
+    "status": {
+     "enum": [
+      "ok",
+      "error",
+      "timeout",
+      "rejected",
+      "no_result"
+     ],
+     "title": "Status",
+     "type": "string"
+    },
+    "exec_ms": {
+     "title": "Exec Ms",
+     "type": "number"
+    },
+    "attempts": {
+     "default": 1,
+     "description": "1 + nombre d'auto-corrections",
+     "title": "Attempts",
+     "type": "integer"
+    }
+   },
+   "required": [
+    "source",
+    "status",
+    "exec_ms"
+   ],
+   "title": "Code",
+   "type": "object"
+  },
+  "ErrorCode": {
+   "description": "Échec côté serveur : le client affiche un message et propose de corriger le LaTeX.",
+   "enum": [
+    "parse_error",
+    "unsupported_type",
+    "image_not_supported",
+    "code_failed",
+    "timeout",
+    "answer_mismatch",
+    "llm_unavailable"
+   ],
+   "title": "ErrorCode",
+   "type": "string"
+  },
+  "ErrorInfo": {
+   "properties": {
+    "code": {
+     "$ref": "#/$defs/ErrorCode"
+    },
+    "message": {
+     "title": "Message",
+     "type": "string"
+    }
+   },
+   "required": [
+    "code",
+    "message"
+   ],
+   "title": "ErrorInfo",
+   "type": "object"
+  },
+  "Escalation": {
+   "properties": {
+    "reason": {
+     "$ref": "#/$defs/EscalationReason"
+    },
+    "detail": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "Ex. confiance OCR 0.42, message d'erreur local",
+     "title": "Detail"
+    },
+    "ocr_confidence": {
+     "anyOf": [
+      {
+       "maximum": 1,
+       "minimum": 0,
+       "type": "number"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Ocr Confidence"
+    }
+   },
+   "required": [
+    "reason"
+   ],
+   "title": "Escalation",
+   "type": "object"
+  },
+  "EscalationReason": {
+   "description": "Pourquoi le client a envoyé la requête au serveur (section « Escalade vers le serveur »).",
+   "enum": [
+    "ocr_low_confidence",
+    "invalid_latex",
+    "out_of_local_scope",
+    "local_code_failed",
+    "device_too_weak",
+    "user_request"
+   ],
+   "title": "EscalationReason",
+   "type": "string"
+  },
+  "Explanation": {
+   "properties": {
+    "level": {
+     "$ref": "#/$defs/Level"
+    },
+    "text_fr": {
+     "description": "Markdown avec formules LaTeX entre $...$",
+     "title": "Text Fr",
+     "type": "string"
+    },
+    "faithfulness": {
+     "description": "Part des égalités vérifiées par SymPy",
+     "maximum": 1,
+     "minimum": 0,
+     "title": "Faithfulness",
+     "type": "number"
+    }
+   },
+   "required": [
+    "level",
+    "text_fr",
+    "faithfulness"
+   ],
+   "title": "Explanation",
+   "type": "object"
+  },
+  "Level": {
+   "enum": [
+    "college",
+    "lycee",
+    "superieur"
+   ],
+   "title": "Level",
+   "type": "string"
+  },
+  "ModelInfo": {
+   "properties": {
+    "code_model": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Code Model"
+    },
+    "code_model_version": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Code Model Version"
+    },
+    "explain_model": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Explain Model"
+    }
+   },
+   "title": "ModelInfo",
+   "type": "object"
+  },
+  "Problem": {
+   "properties": {
+    "latex": {
+     "title": "Latex",
+     "type": "string"
+    },
+    "type": {
+     "$ref": "#/$defs/ProblemType"
+    },
+    "variables": {
+     "items": {
+      "type": "string"
+     },
+     "title": "Variables",
+     "type": "array"
+    },
+    "route": {
+     "description": "Où ce type de problème est censé être traité",
+     "enum": [
+      "local",
+      "server"
+     ],
+     "title": "Route",
+     "type": "string"
+    }
+   },
+   "required": [
+    "latex",
+    "type",
+    "variables",
+    "route"
+   ],
+   "title": "Problem",
+   "type": "object"
+  },
+  "ProblemType": {
+   "enum": [
+    "equation",
+    "system",
+    "derivative",
+    "integral",
+    "limit"
+   ],
+   "title": "ProblemType",
+   "type": "string"
+  },
+  "Result": {
+   "properties": {
+    "latex": {
+     "examples": [
+      "x \\in \\left\\{2 ; 3\\right\\}"
+     ],
+     "title": "Latex",
+     "type": "string"
+    },
+    "sympy": {
+     "description": "Valeur SymPy sérialisée (str)",
+     "examples": [
+      "[2, 3]"
+     ],
+     "title": "Sympy",
+     "type": "string"
+    },
+    "verified": {
+     "description": "Le code exécuté et SymPy donnent le même résultat",
+     "title": "Verified",
+     "type": "boolean"
+    }
+   },
+   "required": [
+    "latex",
+    "sympy",
+    "verified"
+   ],
+   "title": "Result",
+   "type": "object"
+  },
+  "Step": {
+   "properties": {
+    "index": {
+     "title": "Index",
+     "type": "integer"
+    },
+    "text_fr": {
+     "title": "Text Fr",
+     "type": "string"
+    },
+    "latex": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Latex"
+    }
+   },
+   "required": [
+    "index",
+    "text_fr"
+   ],
+   "title": "Step",
+   "type": "object"
+  },
+  "Timings": {
+   "properties": {
+    "ocr_ms": {
+     "default": 0,
+     "title": "Ocr Ms",
+     "type": "number"
+    },
+    "parse_ms": {
+     "default": 0,
+     "title": "Parse Ms",
+     "type": "number"
+    },
+    "llm_ms": {
+     "default": 0,
+     "title": "Llm Ms",
+     "type": "number"
+    },
+    "sandbox_ms": {
+     "default": 0,
+     "title": "Sandbox Ms",
+     "type": "number"
+    },
+    "total_ms": {
+     "default": 0,
+     "title": "Total Ms",
+     "type": "number"
+    }
+   },
+   "title": "Timings",
+   "type": "object"
+  }
+ },
+ "properties": {
+  "api_version": {
+   "default": "1.0",
+   "title": "Api Version",
+   "type": "string"
+  },
+  "request_id": {
+   "title": "Request Id",
+   "type": "string"
+  },
+  "status": {
+   "description": "ok : résultat vérifié ; unverified : résultat SymPy sans confirmation du code (afficher un avertissement) ; error : voir `error`",
+   "enum": [
+    "ok",
+    "unverified",
+    "error"
+   ],
+   "title": "Status",
+   "type": "string"
+  },
+  "problem": {
+   "anyOf": [
+    {
+     "$ref": "#/$defs/Problem"
+    },
+    {
+     "type": "null"
+    }
+   ],
+   "default": null
+  },
+  "result": {
+   "anyOf": [
+    {
+     "$ref": "#/$defs/Result"
+    },
+    {
+     "type": "null"
+    }
+   ],
+   "default": null
+  },
+  "steps": {
+   "default": [],
+   "items": {
+    "$ref": "#/$defs/Step"
+   },
+   "title": "Steps",
+   "type": "array"
+  },
+  "code": {
+   "anyOf": [
+    {
+     "$ref": "#/$defs/Code"
+    },
+    {
+     "type": "null"
+    }
+   ],
+   "default": null
+  },
+  "explanation": {
+   "anyOf": [
+    {
+     "$ref": "#/$defs/Explanation"
+    },
+    {
+     "type": "null"
+    }
+   ],
+   "default": null
+  },
+  "escalation": {
+   "anyOf": [
+    {
+     "$ref": "#/$defs/Escalation"
+    },
+    {
+     "type": "null"
+    }
+   ],
+   "default": null,
+   "description": "Raison d'escalade reçue du client, renvoyée telle quelle"
+  },
+  "error": {
+   "anyOf": [
+    {
+     "$ref": "#/$defs/ErrorInfo"
+    },
+    {
+     "type": "null"
+    }
+   ],
+   "default": null
+  },
+  "models": {
+   "$ref": "#/$defs/ModelInfo",
+   "default": {
+    "code_model": null,
+    "code_model_version": null,
+    "explain_model": null
+   }
+  },
+  "timings": {
+   "$ref": "#/$defs/Timings",
+   "default": {
+    "ocr_ms": 0.0,
+    "parse_ms": 0.0,
+    "llm_ms": 0.0,
+    "sandbox_ms": 0.0,
+    "total_ms": 0.0
+   }
+  },
+  "graph": {
+   "anyOf": [
+    {
+     "additionalProperties": true,
+     "type": "object"
+    },
+    {
+     "type": "null"
+    }
+   ],
+   "default": null,
+   "description": "Réservé : tracé de fonction (SVG ou points)",
+   "title": "Graph"
+  }
+ },
+ "required": [
+  "request_id",
+  "status"
+ ],
+ "title": "SolveResponse",
+ "type": "object"
+}

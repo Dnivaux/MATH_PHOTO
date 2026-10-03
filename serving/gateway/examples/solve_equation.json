@@ -1,0 +1,73 @@
+{
+ "api_version": "1.0",
+ "request_id": "exemple-equation",
+ "status": "ok",
+ "problem": {
+  "latex": "2 x^{2} - 3 x - 5 = 0",
+  "type": "equation",
+  "variables": [
+   "x"
+  ],
+  "route": "server"
+ },
+ "result": {
+  "latex": "x \\in \\left\\{-1 ; \\frac{5}{2}\\right\\}",
+  "sympy": "[-1, 5/2]",
+  "verified": true
+ },
+ "steps": [
+  {
+   "index": 1,
+   "text_fr": "On identifie a = 2, b = -3, c = -5 et on calcule le discriminant.",
+   "latex": "\\Delta = b^{2} - 4ac = \\left(-3\\right)^{2} - 4 \\times 2 \\times \\left(-5\\right) = 49"
+  },
+  {
+   "index": 2,
+   "text_fr": "Le discriminant est strictement positif : l'équation a deux solutions réelles.",
+   "latex": null
+  },
+  {
+   "index": 3,
+   "text_fr": "Première solution.",
+   "latex": "x_1 = \\frac{3 - \\sqrt{49}}{4} = -1"
+  },
+  {
+   "index": 4,
+   "text_fr": "Seconde solution.",
+   "latex": "x_2 = \\frac{3 + \\sqrt{49}}{4} = \\frac{5}{2}"
+  },
+  {
+   "index": 5,
+   "text_fr": "Les solutions sont $x = -1$ et $x = \\frac{5}{2}$.",
+   "latex": null
+  }
+ ],
+ "code": {
+  "language": "python",
+  "source": "# Code de référence (exemple)\nfrom sympy import *\nx = symbols('x')\nresult = [s for s in solve(Eq(2*x**2 - 3*x - 5, 0), x) if s.is_real]\nprint(result)",
+  "stdout": "[-1, 5/2]\n",
+  "status": "ok",
+  "exec_ms": 151.1627630025032,
+  "attempts": 1
+ },
+ "explanation": null,
+ "escalation": {
+  "reason": "out_of_local_scope",
+  "detail": null,
+  "ocr_confidence": null
+ },
+ "error": null,
+ "models": {
+  "code_model": null,
+  "code_model_version": null,
+  "explain_model": null
+ },
+ "timings": {
+  "ocr_ms": 0.0,
+  "parse_ms": 4.28061499769683,
+  "llm_ms": 0.0006539994501508772,
+  "sandbox_ms": 151.1627630025032,
+  "total_ms": 156.99564999886206
+ },
+ "graph": null
+}
