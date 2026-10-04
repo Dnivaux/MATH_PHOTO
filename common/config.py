@@ -11,6 +11,8 @@ ROOT = Path(__file__).resolve().parents[1]
 load_dotenv(ROOT / ".env")
 # Le téléchargement multipart via le proxy d'artefacts MLflow bloque (requêtes Range) : désactivé.
 os.environ.setdefault("MLFLOW_ENABLE_PROXY_MULTIPART_DOWNLOAD", "false")
+# En upload (> 500 Mo), le multipart renvoie des URL présignées vers `minio:9000`, introuvable hors Docker.
+os.environ.setdefault("MLFLOW_ENABLE_PROXY_MULTIPART_UPLOAD", "false")
 
 DATA = ROOT / "data"
 MODELS = ROOT / "models"

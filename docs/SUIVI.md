@@ -9,18 +9,33 @@ Runbook complet : `docs/WEEKEND.md`. Ce fichier donne l'avancement et la suite i
 | 1 | Environnement (CUDA, venv, llama.cpp, env-check) | ✅ Fait | env-check OK : bf16 156 TFLOPS, vLLM 34 k tok/s, llama.cpp CUDA 1 060 tok/s |
 | 2 | Contrat d'API avec le collègue | ⏳ À faire | `make mock`, valider `docs/api/example_response.json` |
 | 3 | Données et banc d'évaluation | ✅ Fait | Éval v1 figée (250 problèmes), pool de 15 000 |
-| 4 | Baselines code | ✅ Fait | 1,5B : 100 % (1,2 s) ; 7B : 99,6 % (3,5 s), pass@4 100 %. **Effet plafond** : jeu v1 trop facile |
-| 4 | Baselines explication | ✅ Fait (à relancer en `-v2`) | Re-noté : 0,6B 69–82 %, 1,7B 88–95 % selon le niveau |
+| 4 | Baselines code | ✅ Fait | 1,5B : 98 % (1,2 s) ; 7B : 99,6 % (3,5 s), pass@4 100 %. **Effet plafond** : jeu v1 trop facile |
+| 4 | Baselines explication | ✅ Fait (à relancer en `-v2`) | Re-noté, lycée : 0,6B 84 %, 1,7B 89 % d'acceptation |
 | 4 | Données du LoRA | ✅ Fait | `data/sft/code_7b_raw.jsonl` : 7 978 exemples |
-| 4 | QLoRA 7B de nuit | 🔄 En cours | Essai 4.6 a), puis lancement 4.6 b) |
-| 5 | Éval du LoRA, données de distillation, explications FR (Qwen3-8B) | ⏳ À faire | Dimanche matin |
-| 6 | Distillations (Math-1,5B et Qwen3-0,6B) | ⏳ À faire | |
-| 7 | Pruning, réparation, GGUF Q8_0 / Q4_K_M | ⏳ À faire | |
+| 4 | QLoRA 7B de nuit | ✅ Fait | `models/teacher-ft-lora` (r=16, 2 époques) |
+| 5 | Éval du LoRA | ✅ Fait | teacher-ft : 100 %, **1,4 s contre 3,5 s** (82 tokens contre 314). Registry : `math-7b-teacher` v1 @champion |
+| 5 | Données de distillation | ✅ Fait | `code_teacher_ft.jsonl` : 11 793 ; `explain_fr.jsonl` : 8 567 (2 998 problèmes, ≈ 95 % acceptés, 0 `<think>`) |
+| 6 | Distillation Math-1,5B | ✅ Fait | 100 %, **0,4 s** (contre 1,2 s pour la baseline), 85 tokens. 9,9 min, 13,2 Go. `math-1.5b-distill` v1 @champion |
+| 6 | Distillation Qwen3-0,6B | ✅ Fait | Acceptation 98,0 / 97,2 / 99,6 % (contre 84 % au lycée pour la baseline), fidélité 99,4 %. `explainer-0.6b` v1 @champion |
+| 7 | Pruning 20 % + réparation | ✅ Fait | 28 → 22 couches (retirées : 11–15, 25), 596 → 502 M. Avant réparation : 17,6 % au lycée ; après : 93,6 / 96,4 / 98,8 % |
+| 7 | GGUF F16 / Q8_0 / Q4_K_M (imatrix) | ✅ Fait | `models/gguf/explainer-0.6b{,-p20}/` |
+| 7 | Éval des GGUF (CPU) | ✅ Fait | Prunée Q4 : 95,2 % au lycée (−1,2 pt contre la version réparée), 109 contre 92 tok/s → on livre la prunée |
 | 8 | Test de la vraie gateway (+ décodage spéculatif) | ⏳ À faire | |
 | 9 | OCR (pix2tex / TexTeller) | ⏳ À faire | Il faut d'abord imprimer et photographier la planche |
 | 10 | Rapport et commit | ⏳ À faire | |
 
-### Bugs corrigés pendant l'étape 4 (à garder pour le rapport)
+### Chaîne de compression de l'explicateur (pour le rapport)
+
+| Modèle | Params | Acceptation collège / lycée / supérieur | Fidélité lycée | Latence p50 | Tokens |
+|---|---|---|---|---|---|
+| baseline-qwen3-0.6b | 596 M | – / 84,0 / – | 96,2 % | 0,3 s | |
+| distill-qwen3-0.6b | 596 M | 98,0 / 97,2 / 99,6 | 99,4 % | 0,75 s | 157 |
+| pruned20 avant réparation | 502 M | 26,4 / 17,6 / 32,0 | 44,5 % | 4,98 s | 642 |
+| pruned20 réparé (LoRA r=32, 1 époque, 6,7 min) | 502 M | 93,6 / 96,4 / 98,8 | 99,2 % | 0,61 s | 159 |
+| GGUF Q4_K_M prunée (CPU, 324 Mo) | 502 M | – / 95,2 / – | 99,4 % | 6,0 s | 260 |
+| GGUF Q4_K_M non prunée (CPU, 378 Mo) | 596 M | – / 94,8 – 95,6 / – | 99,6 % | 7,0 – 7,4 s | 259 |
+
+### Bugs corrigés (à garder pour le rapport)
 
 | Bug | Symptôme | Correction |
 |---|---|---|
@@ -28,71 +43,58 @@ Runbook complet : `docs/WEEKEND.md`. Ce fichier donne l'avancement et la suite i
 | Extraction du code | 7B à 94 % : il ajoute un bloc « Output » après le programme, et c'est ce bloc qui était exécuté | `extract_code` garde le dernier bloc qui ressemble à un programme, plus un test |
 | Filtre d'hallucination trop strict | Les calculs intermédiaires justes du niveau collège étaient rejetés (1,7B : 65 %) | Un nombre issu d'un calcul vérifié par SymPy est accepté (1,7B : 95 %) |
 | API transformers 5 | `warmup_ratio` inconnu | `warmup_steps=0.03` (un float < 1 est un ratio) |
+| Upload MLflow > 500 Mo | `NameResolutionError` sur `minio:9000` (URL présignées internes à Docker) | `MLFLOW_ENABLE_PROXY_MULTIPART_UPLOAD=false` dans `common/config.py` |
+| Tokenizer transformers 5 → llama.cpp | `AttributeError: 'list' object has no attribute 'keys'` à la conversion GGUF | `to_gguf.sh` convertit depuis une copie dont le `tokenizer_config.json` est réécrit au format v4 |
 
-Runs MLflow à taguer `invalid` : `baseline-math-7b*` d'avant le correctif, `baseline-qwen3-*` sans `-v2`.
+### Limites à signaler
+
+- L'`eval_loss` des SFT est optimiste : `sft.py` découpe par ligne, alors qu'un problème apparaît plusieurs fois (k=4 pour le code, 3 niveaux pour les explications). La vraie mesure reste l'éval sur le jeu figé.
+- Le niveau collège souffre le plus du pruning (−4,4 pts).
+- Le format `$$...$$` apparaît dans des explications : vérifier le rendu dans l'app.
+
+### Runs MLflow à taguer `invalid`
+
+- `baseline-qwen3-0.6b` et `baseline-qwen3-1.7b` de l'ancien filtre (hallucinations 2,7 % et 4,5 %). Les re-notés : seulement une fois les `-v2` lancés.
+- `register-math-1.5b-distill` en statut FAILED (première tentative).
+- `baseline-math-1.5b-pass4` : sans `pass_at_4`, probablement lancé en greedy.
 
 ---
 
-## Suite de l'étape 4, à partir de 4.6 b)
+## Suite : à partir de 7.6
 
-### 4.6 b) Lancer le QLoRA de nuit
-
-Prérequis : l'essai 4.6 a) est passé (pas d'OOM, la loss baisse, `gpu_peak_gb` est nettement sous 32 Go), et vLLM est arrêté.
+### 7.6 a) GGUF Q4_K_M prunée (celle qu'on veut livrer)
 
 ```bash
-rm -rf models/test-qlora
-nohup .venv/bin/python -m training.llm.sft --base Qwen/Qwen2.5-Math-7B-Instruct \
-  --data data/sft/code_7b_raw.jsonl --method qlora --r 16 --epochs 2 \
-  --out models/teacher-ft-lora --run-name qlora-7b-r16 > logs_qlora.txt 2>&1 &
+# T1 : llama-server sur CPU, port 8090. Attendre « server is listening »
+serving/llm/serve.sh gguf models/gguf/explainer-0.6b-p20/explainer-0.6b-p20-q4_k_m.gguf explainer-q4
+# T2
+.venv/bin/python -m eval.run_eval explain --base-url http://localhost:8090/v1 --run-name gguf-p20-q4km \
+  --role quantized --no-think --concurrency 4 --extra-tags '{"quant":"Q4_K_M"}'
 ```
 
-- `nohup … &` : l'entraînement continue même si tu fermes le terminal.
-- La sortie va dans `logs_qlora.txt`.
+### 7.6 b) GGUF Q4_K_M non prunée (pour comparer)
 
-### 4.6 c) Vérifier que ça tourne (5 min)
-
+Ctrl-C dans T1, puis :
 ```bash
-tail -f logs_qlora.txt          # Ctrl-C quitte l'affichage, pas l'entraînement
-nvidia-smi                      # un process python, plusieurs Go de VRAM, GPU proche de 100 %
+serving/llm/serve.sh gguf models/gguf/explainer-0.6b/explainer-0.6b-q4_k_m.gguf explainer-q4      # T1
+.venv/bin/python -m eval.run_eval explain --base-url http://localhost:8090/v1 --run-name gguf-q4km \
+  --role quantized --no-think --concurrency 4 --extra-tags '{"quant":"Q4_K_M"}'                    # T2
 ```
 
-Dans MLflow, run `qlora-7b-r16`, onglet **Model metrics** :
-- `loss` (train) doit descendre puis se stabiliser ;
-- `eval_loss` (toutes les 100 étapes) doit suivre. Si elle remonte alors que la loss de train baisse, c'est du **surapprentissage** ;
-- `learning_rate` doit monter pendant le warmup, puis décroître en cosinus.
+**Décision** : on compare `gguf-p20-q4km` à `pruned20-repaired`.
+- Perte de 2 pts ou moins : on livre la prunée.
+- Collège sous 90 % : on livre la non prunée.
 
-Durée estimée : 2 à 4 h. La barre de progression de `logs_qlora.txt` affiche le temps restant.
+Ne pas comparer la latence à vLLM : ici, c'est du CPU. La vitesse utile est dans les runs `gguf-explainer-0.6b*` (`cpu4t_tg_tok_s.*`).
 
-### 4.6 d) Avant d'aller dormir
+### 7.7 Livrer au collègue
 
-- [ ] La loss baisse sur les 50 à 100 premières étapes.
-- [ ] Pas de `CUDA out of memory` dans `logs_qlora.txt`.
-- [ ] Les conteneurs `appwolof` restent arrêtés : ils reprendraient de la VRAM.
-- [ ] Commit du code corrigé :
-  ```bash
-  git add -A && git commit -m "Étape 4 : baselines, correctifs extraction, fidélité, transformers 5"
-  ```
+- Le `.gguf` Q4_K_M retenu, plus l'autre pour comparer.
+- Le prompt `EXPLAIN_SYSTEM` / `EXPLAIN_USER` de `common/prompts.py`, à envoyer tel quel, avec `enable_thinking=False`.
+- Il peut aussi récupérer le fichier depuis le registry : `models:/explainer-0.6b-p20-gguf@champion` (v1, passée en champion après la 7.6).
 
-### 4.6 e) Le matin, contrôle de fin
+### Ensuite
 
-```bash
-tail -n 5 logs_qlora.txt        # doit finir par « modèle sauvé dans models/teacher-ft-lora »
-ls models/teacher-ft-lora       # adapter_model.safetensors, adapter_config.json, lineage.json
-```
-
-À relever dans MLflow : la loss finale, l'`eval_loss` finale, `train_runtime_min` et `gpu_peak_gb`.
-
-### En cas de problème
-
-| Symptôme | Action |
-|---|---|
-| `CUDA out of memory` | Ajouter `--bs 1 --grad-accum 16` (même batch effectif, moins de mémoire) |
-| Loss à `nan` | Baisser le learning rate : `--lr 1e-4` |
-| Le process a disparu | `tail -n 50 logs_qlora.txt`, puis me coller l'erreur |
-| Trop lent (> 6 h prévues) | Arrêter (`pkill -f training.llm.sft`) et relancer avec `--epochs 1` |
-
-### Ensuite : étape 5 (dimanche matin)
-
-Fusionner le LoRA (`merge_lora`), servir `teacher-ft`, puis le comparer à `baseline-math-7b`. Ne t'attends pas à un gain d'exactitude sur la v1 (effet plafond) : regarde plutôt la latence, la longueur des réponses et le taux de code autonome.
-
-Puis générer les données de distillation et les explications françaises avec Qwen3-8B. Le détail est dans `docs/WEEKEND.md`, §5.
+- **Étape 8** : test de la vraie gateway et décodage spéculatif (`docs/WEEKEND.md` §8).
+- **Étape 5.7**, si le temps le permet : relancer les baselines explication en `-v2`.
+- **Commit** : corrections de `common/config.py`, de `to_gguf.sh` et de `SUIVI.md`.
