@@ -261,27 +261,38 @@ def check_explanation(text: str, problem: dict) -> FaithfulnessReport:
     if problem["type"] == "equation" and not ctx.solutions:  # pas de solution réelle
         rep.final_answer_stated = bool(re.search(r"aucune solution|pas de solution|\\emptyset|\\varnothing", text, re.I))
     allowed = allowed_numbers(problem)
+    segments = []  # (nombres, segment entièrement vérifié ?)
     for m in MATH_RE.finditer(text):
         raw = next(g for g in m.groups() if g)
         nums = _numbers(raw)
         rep.n_numbers += len(nums)
-        rep.hallucinated += sorted(nums - allowed)
         seg = normalize_latex(raw, ctx.aliases)
+        seg_ok = seg_bad = 0
         for a, b in split_relations(seg):
             try:
                 lhs, rhs = parse(a, ctx.var_names), parse(b, ctx.var_names)
             except Exception:
                 rep.n_unparsed += 1
+                seg_bad += 1
                 continue
             try:
                 good = _with_time_limit(lambda: relation_holds(lhs, rhs, ctx), 5)
             except (Exception, _Timeout):
                 rep.n_unparsed += 1
+                seg_bad += 1
                 continue
             if good:
                 rep.n_ok += 1
+                seg_ok += 1
                 rep.final_answer_stated |= _is_final_answer(rhs, problem)
             else:
                 rep.n_fail += 1
+                seg_bad += 1
                 rep.failures.append(f"{a} = {b}")
+        segments.append((nums, seg_ok > 0 and seg_bad == 0))
+    # Un nombre absent des étapes n'est pas une hallucination s'il apparaît dans un calcul entièrement vérifié
+    # (ex. « 3 × (−3) − (−14) × 3 = −9 + 42 », niveau collège où chaque calcul est détaillé).
+    derived = set().union(*(n for n, ok in segments if ok)) if segments else set()
+    for nums, _ in segments:
+        rep.hallucinated += sorted(nums - allowed - derived)
     return rep

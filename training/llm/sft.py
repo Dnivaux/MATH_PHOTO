@@ -88,7 +88,7 @@ def main() -> None:
     cfg = SFTConfig(
         output_dir=args.out, run_name=args.run_name, num_train_epochs=args.epochs, learning_rate=lr,
         per_device_train_batch_size=args.bs, per_device_eval_batch_size=args.bs,
-        gradient_accumulation_steps=args.grad_accum, lr_scheduler_type="cosine", warmup_ratio=0.03,
+        gradient_accumulation_steps=args.grad_accum, lr_scheduler_type="cosine", warmup_steps=0.03,  # transformers 5 : un float < 1 est un ratio
         bf16=True, gradient_checkpointing=True, max_length=args.max_len, packing=False,
         optim="paged_adamw_8bit" if lora else "adamw_torch_fused",
         logging_steps=10, eval_strategy="steps" if eval_ds is not None else "no", eval_steps=100,

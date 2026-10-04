@@ -43,13 +43,17 @@ def code_messages(problem: dict) -> list[dict]:
     ]
 
 
-CODE_BLOCK_RE = re.compile(r"```(?:python|py)?\s*\n(.*?)```", re.S)
+CODE_BLOCK_RE = re.compile(r"```(?:python|py)?[ \t]*\n(.*?)```", re.S)
+CODE_HINT_RE = re.compile(r"^\s*(import |from \w+ import |print\(|result\s*=)", re.M)
 
 
 def extract_code(text: str) -> str | None:
     blocks = CODE_BLOCK_RE.findall(text)
     if blocks:
-        return blocks[-1].strip()
+        # Certains modèles (Qwen2.5-Math-7B) ajoutent après le programme un bloc avec la sortie attendue :
+        # on garde le dernier bloc qui ressemble à un programme, pas simplement le dernier bloc.
+        programs = [b for b in blocks if CODE_HINT_RE.search(b)]
+        return (programs or blocks)[-1].strip()
     if "result" in text and ("import" in text or "=" in text):
         return text.strip()
     return None

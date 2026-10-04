@@ -6,6 +6,11 @@
 # Un seul modèle à la fois sur la 5090 pendant le week-end : Ctrl-C avant d'en lancer un autre.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
+# FlashInfer (échantillonnage de vLLM) compile ses noyaux au premier lancement : il lui faut nvcc.
+if [ -x /opt/cuda/bin/nvcc ]; then
+  export CUDA_HOME=/opt/cuda CUDA_PATH=/opt/cuda PATH="/opt/cuda/bin:$PATH"
+  export NVCC_CCBIN="${NVCC_CCBIN:-/usr/bin/g++-15}" CUDAHOSTCXX="${CUDAHOSTCXX:-/usr/bin/g++-15}"
+fi
 PORT="${PORT:-8000}"
 VLLM=(.venv/bin/vllm serve)
 COMMON=(--port "$PORT" --max-model-len 4096 --gpu-memory-utilization "${GPU_UTIL:-0.85}")
