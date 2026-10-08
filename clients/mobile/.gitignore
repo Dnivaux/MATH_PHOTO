@@ -1,0 +1,19 @@
+# dépendances et builds
+node_modules/
+android/.gradle/
+android/build/
+android/app/build/
+android/app/.cxx/
+android/local.properties
+ios/Pods/
+ios/build/
+*.apk
+*.aab
+*.keystore
+!debug.keystore
+# fichiers embarqués téléchargés par `npm run engine-assets` (modèle OCR, Pyodide…)
+android/app/src/main/assets/engine/
+# divers
+.DS_Store
+*.log
+.metro-health-check*
