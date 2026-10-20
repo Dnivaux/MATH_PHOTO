@@ -1,0 +1,86 @@
+[
+ {
+  "file": "00-rendu.png",
+  "kind": "rendu",
+  "latex": "3x-7=11",
+  "python": "3X-7=11",
+  "confidence": 0.994
+ },
+ {
+  "file": "00-photo.png",
+  "kind": "photo",
+  "latex": "3x-7=11",
+  "python": "3X{\\overset{\\underset{\\mathrm{e}}{}}{\\longleftrightarrow}}\\mathbb{Z}=11",
+  "confidence": 0.834
+ },
+ {
+  "file": "01-rendu.png",
+  "kind": "rendu",
+  "latex": "2x^{2}-3x-5=0",
+  "python": "2x^{2}-3x-5=0",
+  "confidence": 1.0
+ },
+ {
+  "file": "01-photo.png",
+  "kind": "photo",
+  "latex": "2x^{2}-3x-5=0",
+  "python": "2X^{2}{\\mathrm{'}}23X\\mathrm{-}5=0",
+  "confidence": 0.854
+ },
+ {
+  "file": "02-rendu.png",
+  "kind": "rendu",
+  "latex": "\\frac{2}{3}+\\frac{5}{6}",
+  "python": "{\\frac{2}{3}}+{\\frac{5}{6}}",
+  "confidence": 1.0
+ },
+ {
+  "file": "02-photo.png",
+  "kind": "photo",
+  "latex": "\\frac{2}{3}+\\frac{5}{6}",
+  "python": "{\\frac{2}{3}}\\underline{{F}}",
+  "confidence": 0.922
+ },
+ {
+  "file": "03-rendu.png",
+  "kind": "rendu",
+  "latex": "\\int x e^{x}\\,dx",
+  "python": "\\textstyle\\int\\!\\chi\\epsilon^{x}\\,d\\chi",
+  "confidence": 0.892
+ },
+ {
+  "file": "04-rendu.png",
+  "kind": "rendu",
+  "latex": "\\lim_{x\\to 0}\\frac{\\sin x}{x}",
+  "python": "\\operatorname*{lim}_{x\\to0}{\\frac{\\sin x}{x}}",
+  "confidence": 0.997
+ },
+ {
+  "file": "04-photo.png",
+  "kind": "photo",
+  "latex": "\\lim_{x\\to 0}\\frac{\\sin x}{x}",
+  "python": "\\operatorname*{lim}_{X\\to0}{\\frac{\\sin X}{X}}",
+  "confidence": 0.955
+ },
+ {
+  "file": "05-rendu.png",
+  "kind": "rendu",
+  "latex": "\\sqrt{18}+\\left(\\frac{2}{3}\\right)^{2}",
+  "python": "{\\sqrt{18}}+({\\frac{2}{3}})^{2}",
+  "confidence": 0.992
+ },
+ {
+  "file": "06-rendu.png",
+  "kind": "rendu",
+  "latex": "f(x)=\\frac{\\sin(x)}{x}",
+  "python": "f(X)={\\frac{\\sin(x)}{x}}",
+  "confidence": 0.957
+ },
+ {
+  "file": "07-rendu.png",
+  "kind": "rendu",
+  "latex": "x^{2}-5x+6=0",
+  "python": "\\chi^{2}-5\\chi+6=0",
+  "confidence": 0.93
+ }
+]

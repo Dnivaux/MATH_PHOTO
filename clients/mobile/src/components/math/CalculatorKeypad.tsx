@@ -1,120 +1,170 @@
+/**
+ * Clavier de la calculatrice : barre (onglets + curseur + effacement), deux rangées de fonctions selon
+ * l'onglet, pavé numérique fixe, bouton Résoudre. Trois familles de touches nettement distinctes :
+ * chiffres clairs, opérations sur l'encre bleue, fonctions en retrait.
+ */
 import React, { useState } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { CalcKey, KEY_PAGES } from './calculatorKeys';
+import { Pressable, StyleSheet, Text, View, Vibration } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { ChevronLeft, ChevronRight, Delete, LucideIcon } from 'lucide-react-native';
+import { radius, space, TOUCH, type, useTheme } from '../../theme';
+import { Button } from '../ui';
+import { CalcKey, FUNCTION_PAGES, KeyLabel as Label, NUMPAD } from './calculatorKeys';
 import { MathFieldAction } from './MathFieldView';
 
 interface Props {
   onKey: (key: CalcKey) => void;
   onAction: (action: MathFieldAction) => void;
   onSolve: () => void;
-  solveLabel?: string;
+  solveLabel: string;
+  solveDisabled?: boolean;
 }
 
-const KIND_STYLE: Record<CalcKey['kind'], { bg: string; fg: string }> = {
-  digit: { bg: '#2C2C2E', fg: '#FFFFFF' },
-  op: { bg: '#3A3A3C', fg: '#FF9F0A' },
-  fn: { bg: '#232326', fg: '#E4E4E7' },
-  var: { bg: '#232326', fg: '#64D2FF' },
-  cmp: { bg: '#3A3A3C', fg: '#FF9F0A' },
-};
+const KEY_H = 50;
 
-/** Clavier de calculatrice scientifique en trois pages */
-export const CalculatorKeypad: React.FC<Props> = ({ onKey, onAction, onSolve, solveLabel = 'Résoudre' }) => {
-  const [page, setPage] = useState(0);
-  const current = KEY_PAGES[page];
-
+const KeyLabel: React.FC<{ label: Label; color: string; big: boolean }> = ({ label, color, big }) => {
+  const size = big ? 22 : 16;
+  if (typeof label === 'string') {
+    return (
+      <Text style={[styles.keyText, { color, fontSize: label.length > 3 ? 15 : size }]} numberOfLines={1} adjustsFontSizeToFit>
+        {label}
+      </Text>
+    );
+  }
+  if ('num' in label) {
+    return (
+      <View style={styles.frac}>
+        <Text style={[styles.fracText, { color }]}>{label.num}</Text>
+        <View style={[styles.fracBar, { backgroundColor: color }]} />
+        <Text style={[styles.fracText, { color }]}>{label.den}</Text>
+      </View>
+    );
+  }
   return (
-    <View style={styles.container}>
-      <View style={styles.topRow}>
-        {KEY_PAGES.map((p, i) => (
-          <TouchableOpacity key={p.id} style={[styles.tab, i === page && styles.tabActive]} onPress={() => setPage(i)}>
-            <Text style={[styles.tabText, i === page && styles.tabTextActive]}>{p.title}</Text>
-          </TouchableOpacity>
-        ))}
-        <View style={{ flex: 1 }} />
-        <Ctl label="◀" onPress={() => onAction('left')} />
-        <Ctl label="▶" onPress={() => onAction('right')} />
-        <Ctl label="⌫" onPress={() => onAction('backspace')} accent />
-        <Ctl label="AC" onPress={() => onAction('clear')} accent />
-      </View>
-
-      <View style={styles.grid}>
-        {current.rows.map((row, r) => (
-          <View key={`${current.id}-${r}`} style={styles.row}>
-            {row.map(key => {
-              const st = KIND_STYLE[key.kind];
-              return (
-                <TouchableOpacity
-                  key={key.label}
-                  style={[styles.key, { backgroundColor: st.bg }]}
-                  onPress={() => onKey(key)}
-                  activeOpacity={0.55}
-                  accessibilityLabel={key.hint ?? key.label}
-                >
-                  <Text
-                    style={[styles.keyText, { color: st.fg }, key.label.length > 3 && styles.keyTextSmall]}
-                    numberOfLines={1}
-                    adjustsFontSizeToFit
-                  >
-                    {key.label}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        ))}
-      </View>
-
-      <TouchableOpacity style={styles.solve} onPress={onSolve} activeOpacity={0.85}>
-        <Text style={styles.solveText}>{solveLabel}</Text>
-      </TouchableOpacity>
+    <View style={styles.composed}>
+      {label.pre ? <Text style={[styles.sup, { color }]}>{label.pre}</Text> : null}
+      <Text style={[styles.keyText, { color, fontSize: label.base.length > 1 ? 16 : 20 }]}>{label.base}</Text>
+      {label.sup ? <Text style={[styles.sup, { color }]}>{label.sup}</Text> : null}
+      {label.sub ? <Text style={[styles.sub, { color }]}>{label.sub}</Text> : null}
     </View>
   );
 };
 
-const Ctl: React.FC<{ label: string; onPress: () => void; accent?: boolean }> = ({ label, onPress, accent }) => (
-  <TouchableOpacity style={[styles.ctl, accent && styles.ctlAccent]} onPress={onPress} activeOpacity={0.6}>
-    <Text style={[styles.ctlText, accent && styles.ctlTextAccent]}>{label}</Text>
-  </TouchableOpacity>
-);
+/** Commande de la barre (curseur, effacement) ; appui long sur Effacer : tout effacer */
+const Tool: React.FC<{ icon: LucideIcon; label: string; action: MathFieldAction; onAction: (a: MathFieldAction) => void }> = ({
+  icon: Icon,
+  label,
+  action,
+  onAction,
+}) => {
+  const { c } = useTheme();
+  return (
+    <Pressable
+      onPress={() => onAction(action)}
+      onLongPress={action === 'backspace' ? () => onAction('clear') : undefined}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityHint={action === 'backspace' ? 'Appui long pour tout effacer' : undefined}
+      android_ripple={{ color: c.line, borderless: true, radius: TOUCH / 2 }}
+      style={styles.tool}>
+      <Icon size={22} color={c.text} strokeWidth={2} />
+    </Pressable>
+  );
+};
+
+export const CalculatorKeypad: React.FC<Props> = ({ onKey, onAction, onSolve, solveLabel, solveDisabled }) => {
+  const { c } = useTheme();
+  const insets = useSafeAreaInsets();
+  const [page, setPage] = useState(0);
+  const family = {
+    digit: { bg: c.keyDigit, fg: c.text },
+    op: { bg: c.keyOp, fg: c.onKeyOp },
+    fn: { bg: c.keyFn, fg: c.text },
+    var: { bg: c.keyFn, fg: c.primary },
+  };
+
+  const press = (key: CalcKey) => {
+    Vibration.vibrate(8);
+    onKey(key);
+  };
+
+  const renderRow = (row: CalcKey[], i: number) => (
+    <View key={i} style={styles.row}>
+      {row.map(key => {
+        const f = family[key.kind];
+        return (
+          <Pressable
+            key={key.id}
+            onPress={() => press(key)}
+            accessibilityRole="button"
+            accessibilityLabel={key.a11y}
+            android_ripple={{ color: c.line }}
+            style={({ pressed }) => [
+              styles.key,
+              { backgroundColor: f.bg },
+              key.kind === 'digit' && { borderColor: c.line, borderWidth: StyleSheet.hairlineWidth },
+              pressed && styles.pressed,
+            ]}>
+            <KeyLabel label={key.label} color={f.fg} big={key.kind !== 'fn'} />
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+
+  return (
+    <View style={[styles.wrap, { backgroundColor: c.surface, borderTopColor: c.line, paddingBottom: insets.bottom + space.sm }]}>
+      <View style={styles.bar}>
+        <View style={[styles.tabs, { backgroundColor: c.surfaceAlt }]} accessibilityRole="tablist">
+          {FUNCTION_PAGES.map((p, i) => {
+            const on = i === page;
+            return (
+              <Pressable
+                key={p.id}
+                onPress={() => setPage(i)}
+                accessibilityRole="tab"
+                accessibilityState={{ selected: on }}
+                style={[styles.tab, on && { backgroundColor: c.surface, shadowColor: c.text }]}>
+                <Text style={[type.label, { color: on ? c.text : c.textMuted }]} numberOfLines={1}>
+                  {p.title}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+        <Tool icon={ChevronLeft} label="Curseur à gauche" action="left" onAction={onAction} />
+        <Tool icon={ChevronRight} label="Curseur à droite" action="right" onAction={onAction} />
+        <Tool icon={Delete} label="Effacer" action="backspace" onAction={onAction} />
+      </View>
+
+      <View style={styles.grid}>
+        {FUNCTION_PAGES[page].rows.map(renderRow)}
+        <View style={[styles.divider, { backgroundColor: c.line }]} />
+        {NUMPAD.map((r, i) => renderRow(r, 10 + i))}
+      </View>
+
+      <Button label={solveLabel} onPress={onSolve} disabled={solveDisabled} style={styles.solve} />
+    </View>
+  );
+};
 
 const styles = StyleSheet.create({
-  container: {
-    backgroundColor: '#1C1C1E',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    paddingHorizontal: 10,
-    paddingTop: 10,
-    paddingBottom: 22,
-  },
-  topRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 },
-  tab: { paddingVertical: 7, paddingHorizontal: 11, borderRadius: 8, backgroundColor: 'rgba(255,255,255,0.06)' },
-  tabActive: { backgroundColor: 'rgba(255,255,255,0.2)' },
-  tabText: { color: '#8E8E93', fontSize: 13, fontWeight: '700' },
-  tabTextActive: { color: '#FFFFFF' },
-  ctl: {
-    minWidth: 38,
-    paddingVertical: 7,
-    paddingHorizontal: 8,
-    borderRadius: 8,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    alignItems: 'center',
-  },
-  ctlAccent: { backgroundColor: 'rgba(255,59,48,0.18)' },
-  ctlText: { color: '#FFFFFF', fontSize: 14, fontWeight: '700' },
-  ctlTextAccent: { color: '#FF453A' },
-  grid: { gap: 7 },
-  row: { flexDirection: 'row', gap: 7 },
-  key: { flex: 1, height: 48, borderRadius: 11, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 2 },
-  keyText: { fontSize: 20, fontWeight: '500' },
-  keyTextSmall: { fontSize: 15 },
-  solve: {
-    marginTop: 10,
-    height: 50,
-    borderRadius: 12,
-    backgroundColor: '#FF3B30',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  solveText: { color: '#FFFFFF', fontSize: 16, fontWeight: '800' },
+  wrap: { borderTopWidth: StyleSheet.hairlineWidth, paddingHorizontal: space.sm, paddingTop: space.sm },
+  bar: { flexDirection: 'row', alignItems: 'center', marginBottom: space.sm },
+  tabs: { flex: 1, flexDirection: 'row', borderRadius: radius.sm, padding: 3, marginRight: space.xs },
+  tab: { flex: 1, minHeight: 40, borderRadius: 6, alignItems: 'center', justifyContent: 'center', elevation: 0, shadowOpacity: 0 },
+  tool: { width: 44, height: TOUCH, alignItems: 'center', justifyContent: 'center' },
+  grid: { gap: 6 },
+  row: { flexDirection: 'row', gap: 6 },
+  key: { flex: 1, height: KEY_H, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 2 },
+  pressed: { opacity: 0.7 },
+  keyText: { fontWeight: '500' },
+  composed: { flexDirection: 'row', alignItems: 'center' },
+  sup: { fontSize: 12, fontWeight: '600', marginBottom: 12 },
+  sub: { fontSize: 11, fontWeight: '600', marginTop: 12 },
+  frac: { alignItems: 'center' },
+  fracText: { fontSize: 13, fontWeight: '600', lineHeight: 15 },
+  fracBar: { height: 1.5, width: 18, marginVertical: 1 },
+  divider: { height: StyleSheet.hairlineWidth, marginVertical: 2 },
+  solve: { marginTop: space.sm },
 });

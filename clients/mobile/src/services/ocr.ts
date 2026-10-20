@@ -1,20 +1,21 @@
 /**
- * OCR sur le téléphone : modèle Texo exécuté dans le moteur embarqué
- * (WebView + onnxruntime-web), aucune donnée ne quitte l'appareil.
+ * OCR sur le téléphone : pix2tex INT8 dans le moteur embarqué. La photo ne quitte pas l'appareil.
  */
-import { FractionRect, MathEngine } from '../../engine/MathEngine';
-import { normalizeOcrLatex } from '../../engine/latexPreprocess';
+import { FractionRect, MathEngine } from '../engine/MathEngine';
+import { normalizeOcrLatex } from '../engine/latexPreprocess';
+import { logEvent } from '../storage/db';
 
 export interface OcrResult {
   latex: string;
   raw: string;
-  /** temps total vu par l'utilisateur (lecture du fichier + prétraitement + inférence) */
+  confidence: number;
+  /** temps vu par l'utilisateur (lecture du fichier, prétraitement, inférence) */
   ms: number;
   inferenceMs: number;
-  source: string;
+  model: string;
 }
 
-/** Lit un fichier local (photo) en base64 sans module natif supplémentaire */
+/** Lit un fichier local (photo) en base64, sans module natif supplémentaire */
 export async function fileToBase64(path: string): Promise<string> {
   const uri = /^(file|content):\/\//.test(path) ? path : `file://${path}`;
   const blob = await (await fetch(uri)).blob();
@@ -29,11 +30,22 @@ export async function fileToBase64(path: string): Promise<string> {
 export async function recognizeOnDevice(base64: string, mime = 'image/jpeg', crop?: FractionRect): Promise<OcrResult> {
   const t0 = Date.now();
   const r = await MathEngine.ocr(base64, mime, crop);
-  return {
+  const out = {
     latex: normalizeOcrLatex(r.raw),
     raw: r.raw,
+    confidence: r.confidence,
     ms: Date.now() - t0,
     inferenceMs: r.inferenceMs,
-    source: r.source,
+    model: r.model,
   };
+  logEvent('ocr', {
+    ms: out.ms,
+    preprocessMs: r.preprocessMs,
+    inferenceMs: r.inferenceMs,
+    tokens: r.tokens,
+    input: r.input,
+    confidence: r.confidence,
+    model: r.model,
+  });
+  return out;
 }

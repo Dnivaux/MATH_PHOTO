@@ -1,56 +1,79 @@
 /**
- * Client du moteur de calcul embarqué (WebView cachée montée par MathEngineHost).
+ * Client du moteur embarqué (WebView cachée montée par MathEngineHost).
  * Les requêtes sont mises en file tant que la page n'est pas prête.
  */
-import type { MathJson } from './mathjsonToSympy';
 
 export interface EngineStatus {
   page: 'loading' | 'ready';
   cortex: 'loading' | 'ready' | 'error';
-  python: 'idle' | 'loading' | 'ready' | 'restarting' | 'error';
-  plot: 'idle' | 'loading' | 'ready';
-  pythonMode?: 'worker' | 'main-thread';
   ocr: 'idle' | 'loading' | 'ready' | 'error';
-  ocrProgress?: number;
   ocrLoadMs?: number;
-  ocrSource?: string;
-  pythonLoadMs?: number;
+  ocrModel?: string;
   error?: string;
 }
 
-export interface ParseResult {
-  json: MathJson;
-  isValid: boolean;
-  latex: string;
+export type ProblemKind =
+  | 'arithmetic'
+  | 'check'
+  | 'linear'
+  | 'equation'
+  | 'system'
+  | 'derivative'
+  | 'integral'
+  | 'limit'
+  | 'function'
+  | 'inequality'
+  | 'expression'
+  | 'invalid'
+  | 'empty';
+
+export type ApiProblemType = 'equation' | 'system' | 'derivative' | 'integral' | 'limit';
+
+export interface Step {
+  text_fr: string;
+  latex: string | null;
+}
+
+/** Données du graphe : courbes en LaTeX, compilées par la page de solution (CortexJS) */
+export interface PlotData {
+  var: string;
+  curves: { label: string; latex: string }[];
+  points: { label: string; x: number; y: number }[];
+}
+
+export interface Analysis {
+  valid: boolean;
+  kind: ProblemKind;
+  /** local : CortexJS sur le téléphone ; server : escalade ; none : hors périmètre */
+  route?: 'local' | 'server' | 'none';
+  apiType?: ApiProblemType;
+  label?: string;
+  variable?: string;
+  statement?: string;
+  result?: { latex: string; numeric: string | null } | null;
+  steps?: Step[];
+  solutions?: (number | null)[];
+  answers?: number[];
+  plot?: PlotData | null;
+  reason?: string;
 }
 
 export interface EvaluateResult {
   exactLatex: string;
-  numericLatex: string;
-  exactIsNumber: boolean;
-  numericIsNumber: boolean;
-  approximate: boolean;
-}
-
-/**
- * Le résultat CortexJS est-il un vrai calcul abouti ? (sinon SymPy prend le relais :
- * fonctions non évaluées comme C(5,2), Re(z), valeurs approchées…)
- */
-export function isConclusive(ev: EvaluateResult): boolean {
-  return (
-    !ev.approximate &&
-    ev.numericIsNumber &&
-    !!ev.exactLatex &&
-    !/\\(mathrm|operatorname|error|placeholder)|\\bot/.test(ev.exactLatex)
-  );
+  numericLatex: string | null;
+  value: number | null;
+  isNumber: boolean;
 }
 
 export interface OcrRawResult {
   raw: string;
+  confidence: number;
+  tokens: number;
+  input: [number, number];
   waitMs: number;
   preprocessMs: number;
   inferenceMs: number;
-  source: string;
+  model: string;
 }
 
 /** Zone à lire, en fractions de l'image (0..1) */
@@ -61,24 +84,30 @@ export interface FractionRect {
   height: number;
 }
 
-/** Données du graphe interactif (courbes en JavaScript, recalculées au zoom) */
-export interface PlotData {
-  var: string;
-  range?: [number, number];
-  curves: { label: string; js: string; latex: string }[];
-  points: { label: string; x: number; y: number }[];
+export interface FaithfulnessContext {
+  text: string;
+  ptype: string;
+  vars?: string[];
+  solutions?: Record<string, number>[];
+  answers?: number[];
+  answerFn?: string;
+  integrand?: string;
+  sources: string[];
+  noRealSolution?: boolean;
+  /** valeurs nommées dans les étapes (a = 2, \Delta = 49...) */
+  symbols?: Record<string, number>;
 }
 
-export interface PythonRunResult {
-  ok: boolean;
-  steps: { label: string; latex: string }[];
-  result_latex: string | null;
-  numeric_latex: string | null;
-  plot: PlotData | null;
-  error: string | null;
-  traceback?: string;
-  plot_error?: string;
-  ms: number;
+export interface FaithfulnessReport {
+  ok: number;
+  fail: number;
+  unparsed: number;
+  failures: string[];
+  finalStated: boolean;
+  numbers: number;
+  hallucinated: string[];
+  score: number;
+  accept: boolean;
 }
 
 type Injector = (js: string) => void;
@@ -91,23 +120,22 @@ class MathEngineClient {
   private pending = new Map<string, Pending>();
   private counter = 0;
   private listeners = new Set<(s: EngineStatus) => void>();
-  private pythonWaiters: (() => void)[] = [];
 
-  status: EngineStatus = { page: 'loading', cortex: 'loading', python: 'idle', plot: 'idle', ocr: 'idle' };
+  status: EngineStatus = { page: 'loading', cortex: 'loading', ocr: 'idle' };
 
-  /** Appelé par MathEngineHost */
   attach(inject: Injector) {
     this.inject = inject;
   }
 
-  /** Appelé par MathEngineHost quand la WebView est rechargée */
+  /** WebView rechargée (processus de rendu tué par le système, par ex.) : les requêtes en cours échouent */
   reset() {
     this.pageReady = false;
-    this.status = { page: 'loading', cortex: 'loading', python: 'idle', plot: 'idle', ocr: 'idle' };
+    this.status = { page: 'loading', cortex: 'loading', ocr: 'idle' };
+    this.pending.forEach(p => p.reject(new Error('Moteur redémarré')));
+    this.pending.clear();
     this.emit();
   }
 
-  /** Message brut reçu de la WebView */
   handleMessage(raw: string) {
     let msg: any;
     try {
@@ -116,7 +144,8 @@ class MathEngineClient {
       return;
     }
     if (msg.type === 'status') {
-      const { type, ...rest } = msg;
+      const rest = { ...msg };
+      delete rest.type;
       this.status = { ...this.status, ...rest };
       if (rest.page === 'ready') {
         this.pageReady = true;
@@ -124,19 +153,20 @@ class MathEngineClient {
         this.queue = [];
         q.forEach(js => this.inject?.(js));
       }
-      if (rest.python === 'ready') {
-        this.pythonWaiters.forEach(w => w());
-        this.pythonWaiters = [];
-      }
       this.emit();
       return;
     }
     if (msg.type === 'response') {
       const p = this.pending.get(msg.id);
-      if (!p) return;
+      if (!p) {
+        return;
+      }
       this.pending.delete(msg.id);
-      if (msg.ok) p.resolve(msg.data);
-      else p.reject(new Error(msg.error));
+      if (msg.ok) {
+        p.resolve(msg.data);
+      } else {
+        p.reject(new Error(msg.error));
+      }
     }
   }
 
@@ -150,13 +180,13 @@ class MathEngineClient {
     this.listeners.forEach(l => l(this.status));
   }
 
-  private request<T>(method: string, params: object, timeoutMs = 90000): Promise<T> {
+  private request<T>(method: string, params: object, timeoutMs: number): Promise<T> {
     const id = `q${++this.counter}`;
     const js = `window.__engine && window.__engine.request(${JSON.stringify(id)}, ${JSON.stringify(method)}, ${JSON.stringify(params)}); true;`;
     return new Promise<T>((resolve, reject) => {
       const timer = setTimeout(() => {
         this.pending.delete(id);
-        reject(new Error(`Moteur : pas de réponse à ${method}`));
+        reject(new Error('Le moteur de calcul ne répond pas'));
       }, timeoutMs);
       this.pending.set(id, {
         resolve: v => {
@@ -168,45 +198,46 @@ class MathEngineClient {
           reject(e);
         },
       });
-      if (this.pageReady && this.inject) this.inject(js);
-      else this.queue.push(js);
+      if (this.pageReady && this.inject) {
+        this.inject(js);
+      } else {
+        this.queue.push(js);
+      }
     });
   }
 
-  parse(latex: string) {
-    return this.request<ParseResult>('parse', { latex }, 20000);
+  analyze(latex: string) {
+    return this.request<Analysis>('analyze', { latex }, 20000);
   }
 
   evaluate(latex: string) {
     return this.request<EvaluateResult>('evaluate', { latex }, 20000);
   }
 
-  /** Charge le modèle OCR (téléchargé une fois, puis en cache) */
+  isValid(latex: string) {
+    return this.request<boolean>('isValid', { latex }, 10000);
+  }
+
+  values(list: string[]) {
+    return this.request<(number | null)[]>('values', { list }, 10000);
+  }
+
+  /** Le serveur a-t-il répondu pour le problème envoyé ? */
+  sameProblem(sent: string, received: string, type: string) {
+    return this.request<boolean>('sameProblem', { sent, received, type }, 10000);
+  }
+
+  checkExplanation(ctx: FaithfulnessContext) {
+    return this.request<FaithfulnessReport>('checkExplanation', ctx, 30000);
+  }
+
   ocrInit() {
-    return this.request<boolean>('ocrInit', {}, 600000);
+    return this.request<boolean>('ocrInit', {}, 120000);
   }
 
-  /** OCR embarqué : image en base64 (JPEG/PNG), zone optionnelle en fractions */
+  /** OCR embarqué : image en base64 (JPEG/PNG), zone optionnelle en fractions de l'image */
   ocr(imageBase64: string, mime = 'image/jpeg', crop?: FractionRect) {
-    return this.request<OcrRawResult>('ocr', { imageBase64, mime, crop }, 600000);
-  }
-
-  /** Attend que Pyodide + SymPy soient chargés (préchargés au démarrage) */
-  waitForPython(timeoutMs = 120000): Promise<void> {
-    if (this.status.python === 'ready') return Promise.resolve();
-    return new Promise((resolve, reject) => {
-      const t = setTimeout(() => reject(new Error('Pyodide ne s\'est pas chargé (connexion internet ?)')), timeoutMs);
-      this.pythonWaiters.push(() => {
-        clearTimeout(t);
-        resolve();
-      });
-    });
-  }
-
-  async runPython(code: string, opts: { plot?: boolean; timeoutMs?: number } = {}) {
-    await this.waitForPython();
-    const timeoutMs = opts.timeoutMs ?? (opts.plot && this.status.plot !== 'ready' ? 90000 : 20000);
-    return this.request<PythonRunResult>('runPython', { code, plot: !!opts.plot, timeoutMs }, timeoutMs + 5000);
+    return this.request<OcrRawResult>('ocr', { imageBase64, mime, crop }, 120000);
   }
 }
 

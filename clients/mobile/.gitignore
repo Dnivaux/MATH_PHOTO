@@ -11,9 +11,21 @@ ios/build/
 *.aab
 *.keystore
 !debug.keystore
-# fichiers embarqués téléchargés par `npm run engine-assets` (modèle OCR, Pyodide…)
+# fichiers embarqués copiés par `npm run engine-assets`
 android/app/src/main/assets/engine/
+# bibliothèques NPU copiées par la compilation de llama.rn (tâche syncRNLlamaHtpAssets)
+android/app/src/main/assets/ggml-hexagon/
+# export ONNX de pix2tex (régénéré par scripts/pix2tex/export_onnx.py)
+scripts/pix2tex/.venv/
+scripts/pix2tex/weights/
+scripts/pix2tex/onnx/
+# bancs navigateur (générés)
+scripts/engine-harness/.build/
+scripts/engine-harness/engine-bundle.js
+scripts/engine-harness/ui-*.html
 # divers
 .DS_Store
 *.log
 .metro-health-check*
+# cache Python des scripts
+__pycache__/

@@ -2,6 +2,7 @@ import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import Animated, { StyleProps } from 'react-native-reanimated';
 import { GestureDetector, PanGesture } from 'react-native-gesture-handler';
+import { camera, TOUCH } from '../../theme';
 
 interface ResizableBoundingBoxProps {
   animatedStyle: StyleProps;
@@ -12,10 +13,37 @@ interface ResizableBoundingBoxProps {
   resizeBottomRightGesture: PanGesture;
 }
 
-const HANDLE_SIZE = 36;
-const CORNER_THICKNESS = 4;
-const CORNER_LENGTH = 20;
+const CORNER = 28;
+const THICK = 4;
 
+type Corner = 'tl' | 'tr' | 'bl' | 'br';
+
+/** Équerre d'un coin du cadre : blanche, épaisse, avec une ombre pour rester visible sur le papier */
+const Bracket: React.FC<{ corner: Corner }> = ({ corner }) => {
+  const top = corner[0] === 't';
+  const left = corner[1] === 'l';
+  return (
+    <View
+      style={[
+        styles.bracket,
+        top ? { top: 0 } : { bottom: 0 },
+        left ? { left: 0 } : { right: 0 },
+        {
+          borderTopWidth: top ? THICK : 0,
+          borderBottomWidth: top ? 0 : THICK,
+          borderLeftWidth: left ? THICK : 0,
+          borderRightWidth: left ? 0 : THICK,
+          borderTopLeftRadius: top && left ? 12 : 0,
+          borderTopRightRadius: top && !left ? 12 : 0,
+          borderBottomLeftRadius: !top && left ? 12 : 0,
+          borderBottomRightRadius: !top && !left ? 12 : 0,
+        },
+      ]}
+    />
+  );
+};
+
+/** Cadre de lecture : le déplacer par le centre, l'ajuster par les coins */
 export const ResizableBoundingBox: React.FC<ResizableBoundingBoxProps> = ({
   animatedStyle,
   panBoxGesture,
@@ -24,113 +52,59 @@ export const ResizableBoundingBox: React.FC<ResizableBoundingBoxProps> = ({
   resizeBottomLeftGesture,
   resizeBottomRightGesture,
 }) => {
+  const handles: [Corner, PanGesture][] = [
+    ['tl', resizeTopLeftGesture],
+    ['tr', resizeTopRightGesture],
+    ['bl', resizeBottomLeftGesture],
+    ['br', resizeBottomRightGesture],
+  ];
   return (
-    <Animated.View style={[styles.boxContainer, animatedStyle]}>
-      {/* Center Pan area for moving the bounding box */}
+    <Animated.View
+      style={[styles.box, animatedStyle]}
+      accessible
+      accessibilityLabel="Cadre de lecture"
+      accessibilityHint="Place une seule formule dans le cadre. Fais glisser le cadre ou ses coins pour l'ajuster.">
       <GestureDetector gesture={panBoxGesture}>
-        <View style={styles.centerDragArea}>
-          <View style={styles.aimCrosshair} />
-        </View>
+        <View style={StyleSheet.absoluteFill} />
       </GestureDetector>
-
-      {/* Frame border */}
-      <View style={styles.boxBorder} pointerEvents="none" />
-
-      {/* Top Left Corner */}
-      <GestureDetector gesture={resizeTopLeftGesture}>
-        <View style={[styles.handleTouchTarget, styles.topLeftHandle]}>
-          <View style={[styles.cornerHorizontal, { top: 0, left: 0 }]} />
-          <View style={[styles.cornerVertical, { top: 0, left: 0 }]} />
-        </View>
-      </GestureDetector>
-
-      {/* Top Right Corner */}
-      <GestureDetector gesture={resizeTopRightGesture}>
-        <View style={[styles.handleTouchTarget, styles.topRightHandle]}>
-          <View style={[styles.cornerHorizontal, { top: 0, right: 0 }]} />
-          <View style={[styles.cornerVertical, { top: 0, right: 0 }]} />
-        </View>
-      </GestureDetector>
-
-      {/* Bottom Left Corner */}
-      <GestureDetector gesture={resizeBottomLeftGesture}>
-        <View style={[styles.handleTouchTarget, styles.bottomLeftHandle]}>
-          <View style={[styles.cornerHorizontal, { bottom: 0, left: 0 }]} />
-          <View style={[styles.cornerVertical, { bottom: 0, left: 0 }]} />
-        </View>
-      </GestureDetector>
-
-      {/* Bottom Right Corner */}
-      <GestureDetector gesture={resizeBottomRightGesture}>
-        <View style={[styles.handleTouchTarget, styles.bottomRightHandle]}>
-          <View style={[styles.cornerHorizontal, { bottom: 0, right: 0 }]} />
-          <View style={[styles.cornerVertical, { bottom: 0, right: 0 }]} />
-        </View>
-      </GestureDetector>
+      <View style={styles.edge} pointerEvents="none" />
+      {handles.map(([corner, gesture]) => (
+        <GestureDetector key={corner} gesture={gesture}>
+          <View
+            style={[
+              styles.handle,
+              corner[0] === 't' ? { top: -TOUCH / 4 } : { bottom: -TOUCH / 4 },
+              corner[1] === 'l' ? { left: -TOUCH / 4 } : { right: -TOUCH / 4 },
+            ]}>
+            <View style={styles.handleInner}>
+              <Bracket corner={corner} />
+            </View>
+          </View>
+        </GestureDetector>
+      ))}
     </Animated.View>
   );
 };
 
 const styles = StyleSheet.create({
-  boxContainer: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    zIndex: 10,
-  },
-  boxBorder: {
+  box: { position: 'absolute', top: 0, left: 0, zIndex: 10 },
+  edge: {
     ...StyleSheet.absoluteFillObject,
-    borderColor: 'rgba(255, 255, 255, 0.4)',
+    borderColor: 'rgba(255, 255, 255, 0.55)',
     borderWidth: 1,
     borderRadius: 12,
   },
-  centerDragArea: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  aimCrosshair: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: 'rgba(255, 75, 75, 0.6)',
-  },
-  handleTouchTarget: {
+  handle: { position: 'absolute', width: TOUCH, height: TOUCH, zIndex: 20 },
+  handleInner: { position: 'absolute', top: TOUCH / 4, left: TOUCH / 4, right: TOUCH / 4, bottom: TOUCH / 4 },
+  bracket: {
     position: 'absolute',
-    width: HANDLE_SIZE,
-    height: HANDLE_SIZE,
-    zIndex: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  topLeftHandle: {
-    top: -HANDLE_SIZE / 4,
-    left: -HANDLE_SIZE / 4,
-  },
-  topRightHandle: {
-    top: -HANDLE_SIZE / 4,
-    right: -HANDLE_SIZE / 4,
-  },
-  bottomLeftHandle: {
-    bottom: -HANDLE_SIZE / 4,
-    left: -HANDLE_SIZE / 4,
-  },
-  bottomRightHandle: {
-    bottom: -HANDLE_SIZE / 4,
-    right: -HANDLE_SIZE / 4,
-  },
-  cornerHorizontal: {
-    position: 'absolute',
-    width: CORNER_LENGTH,
-    height: CORNER_THICKNESS,
-    backgroundColor: '#FF3B30',
-    borderRadius: 2,
-  },
-  cornerVertical: {
-    position: 'absolute',
-    width: CORNER_THICKNESS,
-    height: CORNER_LENGTH,
-    backgroundColor: '#FF3B30',
-    borderRadius: 2,
+    width: CORNER,
+    height: CORNER,
+    borderColor: camera.frame,
+    shadowColor: '#000',
+    shadowOpacity: 0.5,
+    shadowRadius: 3,
+    shadowOffset: { width: 0, height: 1 },
+    elevation: 2,
   },
 });

@@ -41,7 +41,9 @@ export function preprocessLatex(raw: string): PreprocessedLatex {
     let body = cleaned.slice(m[0].length).trim();
     // \left( ... \right) ou ( ... ) englobant tout le corps
     const wrapped = body.match(/^\\left\((.*)\\right\)$/s) || body.match(/^\((.*)\)$/s);
-    if (wrapped && balanced(wrapped[1])) body = wrapped[1];
+    if (wrapped && balanced(wrapped[1])) {
+      body = wrapped[1];
+    }
     if (body.length > 0) {
       return { cleaned, toParse: body, derivative: { variable: m[2], order } };
     }
@@ -52,26 +54,38 @@ export function preprocessLatex(raw: string): PreprocessedLatex {
 function balanced(s: string): boolean {
   let depth = 0;
   for (const c of s) {
-    if (c === '(') depth++;
-    if (c === ')') depth--;
-    if (depth < 0) return false;
+    if (c === '(') {
+      depth++;
+    }
+    if (c === ')') {
+      depth--;
+    }
+    if (depth < 0) {
+      return false;
+    }
   }
   return depth === 0;
 }
 
 /** Contenu d'un groupe {…} commençant à l'indice i (accolade ouvrante) */
 function readGroup(s: string, i: number): { content: string; end: number } | null {
-  if (s[i] !== '{') return null;
+  if (s[i] !== '{') {
+    return null;
+  }
   let depth = 0;
   for (let j = i; j < s.length; j++) {
     if (s[j] === '\\') {
       j++;
       continue;
     }
-    if (s[j] === '{') depth++;
+    if (s[j] === '{') {
+      depth++;
+    }
     if (s[j] === '}') {
       depth--;
-      if (depth === 0) return { content: s.slice(i + 1, j), end: j + 1 };
+      if (depth === 0) {
+        return { content: s.slice(i + 1, j), end: j + 1 };
+      }
     }
   }
   return null;
@@ -82,15 +96,37 @@ function unwrap(s: string, cmd: string): string {
   let out = s;
   for (let guard = 0; guard < 50; guard++) {
     const idx = out.indexOf(cmd + '{');
-    if (idx < 0) break;
+    if (idx < 0) {
+      break;
+    }
     const g = readGroup(out, idx + cmd.length);
-    if (!g) break;
+    if (!g) {
+      break;
+    }
     out = out.slice(0, idx) + '{' + g.content + '}' + out.slice(g.end);
   }
   return out;
 }
 
-const OPERATORS = ['lim', 'sin', 'cos', 'tan', 'ln', 'log', 'exp', 'max', 'min', 'arcsin', 'arccos', 'arctan', 'sinh', 'cosh', 'tanh', 'gcd', 'det'];
+const OPERATORS = [
+  'lim',
+  'sin',
+  'cos',
+  'tan',
+  'ln',
+  'log',
+  'exp',
+  'max',
+  'min',
+  'arcsin',
+  'arccos',
+  'arctan',
+  'sinh',
+  'cosh',
+  'tanh',
+  'gcd',
+  'det',
+];
 
 /**
  * Normalise la sortie brute de l'OCR (jetons séparés par des espaces, mise en
@@ -102,7 +138,9 @@ export function normalizeOcrLatex(raw: string): string {
   const tokens = s.split(/\s+/).filter(Boolean);
   s = '';
   for (const t of tokens) {
-    if (/\\[a-zA-Z]+\*?$/.test(s) && /^[a-zA-Z]/.test(t)) s += ' ';
+    if (/\\[a-zA-Z]+\*?$/.test(s) && /^[a-zA-Z]/.test(t)) {
+      s += ' ';
+    }
     s += t;
   }
   for (const cmd of ['\\boldsymbol', '\\mathbf', '\\bm', '\\mathit', '\\boxed', '\\mathrm', '\\textbf', '\\pmb']) {
@@ -112,13 +150,23 @@ export function normalizeOcrLatex(raw: string): string {
   s = s.replace(/\\(rarr|rightarrow|longrightarrow|to)(?![a-zA-Z])/g, '\\to ');
   // tableau d'une seule ligne : on retire l'environnement
   const arr = s.match(/^\\begin\{(array|aligned|gathered)\}(\{[^}]*\})?(.*)\\end\{\1\}$/);
-  if (arr && !arr[3].includes('\\\\')) s = arr[3];
+  if (arr && !arr[3].includes('\\\\')) {
+    s = arr[3];
+  }
   s = s.replace(/\\(displaystyle|textstyle)/g, '');
+  // pix2tex lit parfois le x italique comme \chi, ou en capitale : dans un exercice, c'est x
+  // (une commande collée devant garde une espace : \int\chi -> \int x, pas \intx)
+  s = s.replace(/(\\[a-zA-Z]+)?\\chi(?![a-zA-Z])/g, (_m, cmd) => (cmd ? `${cmd} ` : '') + 'x');
+  if (!/x/.test(s.replace(/\\[a-zA-Z]+/g, ''))) {
+    s = s.replace(/(^|[^\\a-zA-Z])X(?![a-zA-Z])/g, '$1x');
+  }
   // accolades inutiles : autour de \frac{d}{dx} et autour de toute l'expression
   s = s.replace(/\{(\\frac\{d\}\{d[a-zA-Z]\})\}/g, '$1');
   for (let guard = 0; guard < 5 && s.startsWith('{'); guard++) {
     const g = readGroup(s, 0);
-    if (!g || g.end !== s.length) break;
+    if (!g || g.end !== s.length) {
+      break;
+    }
     s = g.content;
   }
   return cleanLatex(s);

@@ -1,319 +1,286 @@
-import React, { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { MathRenderer } from '../components/math/MathRenderer';
-import { GraphView } from '../components/math/GraphView';
-import { CodeBlock } from '../components/math/CodeBlock';
-import {
-  explainSolution,
-  ROUTE_LABELS,
-  solve,
-  SolveError,
-  SolveResult,
-  toNotebook,
-  toPythonFile,
-  CodeAttempt,
-  Timing,
-} from '../pipeline/solve';
-import { MathEngine } from '../engine/MathEngine';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { StatusBar, View } from 'react-native';
+import { Pencil } from 'lucide-react-native';
+import { AppBar, IconButton } from '../components/ui';
+import { DocState, SolutionDocument } from '../components/solution/SolutionDocument';
+import { getSettings, updateSettings } from '../config';
+import { Level, LEVEL_LABELS } from '../explain/prompt';
+import { explain, explainAvailability } from '../pipeline/explain';
+import { enqueue } from '../pipeline/queue';
+import { solve } from '../pipeline/solve';
+import { Solution, SolveError } from '../pipeline/types';
+import { addHistory, getHistoryItem, subscribeHistory, updateHistory } from '../state/history';
+import { subscribeModel } from '../explain/modelStore';
+import { useTheme } from '../theme';
 
-interface SolutionDetailScreenProps {
+interface Props {
   route: any;
   navigation: any;
 }
 
-type ExplainState = { status: 'idle' | 'loading' | 'done' | 'error'; text?: string };
+type ExplainView = NonNullable<DocState['explain']>;
 
-export const SolutionDetailScreen: React.FC<SolutionDetailScreenProps> = ({ route, navigation }) => {
-  const latex: string = route.params?.latex || '';
-  const [progress, setProgress] = useState('Préparation…');
-  const [result, setResult] = useState<SolveResult | null>(null);
-  const [error, setError] = useState<{ message: string; attempts: CodeAttempt[]; timings: Timing[] } | null>(null);
-  const [explanation, setExplanation] = useState<ExplainState>({ status: 'idle' });
-  const [scrollEnabled, setScrollEnabled] = useState(true);
-  const [showCode, setShowCode] = useState(false);
+const LEVELS = (Object.keys(LEVEL_LABELS) as Level[]).map(id => ({ id, label: LEVEL_LABELS[id] }));
 
-  const run = useCallback(async () => {
-    setResult(null);
-    setError(null);
-    setExplanation({ status: 'idle' });
-    try {
-      const r = await solve(latex, setProgress);
-      setResult(r);
-    } catch (e: any) {
-      setError({
-        message: e?.message ?? String(e),
-        attempts: e instanceof SolveError ? e.attempts : [],
-        timings: e instanceof SolveError ? e.timings : [],
+const ERROR_TITLES: Record<string, string> = {
+  invalid: 'Formule non comprise',
+  unsupported: 'Pas encore pris en charge',
+  disabled: 'Le serveur est désactivé',
+  offline: 'En attente du réseau',
+  server: 'Le serveur n’a pas abouti',
+  empty: 'Formule vide',
+};
+
+/**
+ * Revenir sur un écran Solution déjà ouvert (Modifier -> calculatrice -> Résoudre, ou l'historique) ne fait
+ * que changer ses paramètres : on remonte alors la vue à neuf, sinon elle garderait l'ancienne formule.
+ */
+export const SolutionDetailScreen: React.FC<Props> = ({ route, navigation }) => {
+  const p = route.params ?? {};
+  const key = p.historyId ? `h${p.historyId}` : `l${p.latex ?? ''}#${p.ocrConfidence ?? ''}`;
+  return <SolutionView key={key} route={route} navigation={navigation} />;
+};
+
+const SolutionView: React.FC<Props> = ({ route, navigation }) => {
+  const { c, scheme } = useTheme();
+  const params: { latex?: string; historyId?: number; ocrConfidence?: number | null } = route.params ?? {};
+  const [historyId, setHistoryId] = useState<number | null>(params.historyId ?? null);
+  // l'explication peut finir avant que l'entrée d'historique soit créée : on lit l'identifiant à jour
+  const historyRef = useRef<number | null>(params.historyId ?? null);
+  historyRef.current = historyId;
+  const [latex, setLatex] = useState(params.latex ?? '');
+  const [phase, setPhase] = useState<DocState['phase']>('loading');
+  const [progress, setProgress] = useState('Lecture de la formule…');
+  const [error, setError] = useState<DocState['error']>();
+  const [solution, setSolution] = useState<Solution | null>(null);
+  const [level, setLevel] = useState<Level>(getSettings().level);
+  const [ex, setEx] = useState<ExplainView | undefined>();
+  const [modelTick, setModelTick] = useState(0);
+  const abort = useRef<AbortController | null>(null);
+  const textRef = useRef('');
+  const flushTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => subscribeModel(() => setModelTick(t => t + 1)), []);
+
+  const showError = (e: unknown) => {
+    const code = e instanceof SolveError ? e.code : 'server';
+    const queued = e instanceof SolveError && e.queued;
+    setError({
+      title: ERROR_TITLES[code] ?? 'Échec',
+      message: queued
+        ? 'Ce problème a besoin du serveur et tu es hors ligne. Il est enregistré dans l’historique et partira dès que la connexion reviendra.'
+        : (e as Error).message,
+      canRetry: code === 'server' || code === 'offline',
+      canEdit: code !== 'offline' || !queued,
+      queued,
+    });
+    setPhase('error');
+  };
+
+  const run = useCallback(
+    async (opts: { forceServer?: boolean } = {}) => {
+      if (!latex) {
+        return;
+      }
+      setPhase('loading');
+      setError(undefined);
+      setEx(undefined);
+      try {
+        const sol = await solve(latex, { ocrConfidence: params.ocrConfidence, forceServer: opts.forceServer, onProgress: setProgress });
+        setSolution(sol);
+        setPhase('done');
+        const id = await addHistory(latex, 'done', sol);
+        setHistoryId(id);
+      } catch (e) {
+        if (e instanceof SolveError && e.code === 'offline') {
+          const id = await enqueue(latex, { ocrConfidence: params.ocrConfidence });
+          setHistoryId(id);
+          showError(new SolveError(e.message, 'offline', true));
+          return;
+        }
+        showError(e);
+      }
+    },
+    [latex, params.ocrConfidence],
+  );
+
+  // ouverture depuis l'historique, ou nouvelle résolution
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      if (params.historyId) {
+        const item = await getHistoryItem(params.historyId);
+        if (!alive || !item) {
+          return;
+        }
+        setLatex(item.latex);
+        if (item.status === 'done' && item.solution) {
+          setSolution(item.solution);
+          setPhase('done');
+        } else if (item.status === 'pending') {
+          showError(new SolveError('', 'offline', true));
+        } else {
+          showError(new SolveError(item.error ?? 'Échec', 'server'));
+        }
+      } else {
+        run();
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // une question en attente qui vient d'être résolue par la file
+  useEffect(() => {
+    if (phase !== 'error' || !error?.queued || !historyId) {
+      return;
+    }
+    return subscribeHistory(async () => {
+      const item = await getHistoryItem(historyId);
+      if (item?.status === 'done' && item.solution) {
+        setSolution(item.solution);
+        setPhase('done');
+      }
+    });
+  }, [phase, error, historyId]);
+
+  // ---------------------------------------------------------------- explication
+
+  const startExplain = useCallback(async (sol: Solution, lvl: Level) => {
+    const av = explainAvailability(sol);
+    if (!av.ok) {
+      if (av.reason === 'not_eligible') {
+        return setEx(undefined);
+      }
+      return setEx({
+        status: 'unavailable',
+        level: lvl,
+        message: av.message,
+        action:
+          av.reason === 'no_model'
+            ? { id: 'install-model', label: 'Installer le modèle', icon: 'download' }
+            : { id: 'open-settings', label: 'Ouvrir les réglages', icon: 'info' },
       });
     }
-  }, [latex]);
+    abort.current?.abort();
+    const ctrl = new AbortController();
+    abort.current = ctrl;
+    textRef.current = '';
+    setEx({ status: 'loading', via: av.via, level: lvl });
+    try {
+      const out = await explain(
+        sol,
+        lvl,
+        t => {
+          textRef.current = t;
+          if (!flushTimer.current) {
+            flushTimer.current = setTimeout(() => {
+              flushTimer.current = null;
+              if (!ctrl.signal.aborted || textRef.current) {
+                setEx(prev => (prev && prev.level === lvl ? { ...prev, status: 'streaming', text: textRef.current } : prev));
+              }
+            }, 120);
+          }
+        },
+        ctrl.signal,
+      );
+      if (flushTimer.current) {
+        clearTimeout(flushTimer.current);
+      }
+      flushTimer.current = null;
+      setEx({ status: 'done', via: out.source, level: lvl, text: out.text, report: out.report });
+      const next = { ...sol, explanation: out };
+      setSolution(next);
+      if (historyRef.current) {
+        updateHistory(historyRef.current, { solution: next }).catch(() => {});
+      }
+    } catch (e) {
+      if (flushTimer.current) {
+        clearTimeout(flushTimer.current);
+      }
+      flushTimer.current = null;
+      if (ctrl.signal.aborted && textRef.current) {
+        setEx({ status: 'done', via: av.via, level: lvl, text: textRef.current, report: null });
+      } else if (!ctrl.signal.aborted) {
+        setEx({
+          status: 'error',
+          via: av.via,
+          level: lvl,
+          message: `Explication indisponible : ${(e as Error).message}`,
+          action: { id: 'regenerate', label: 'Réessayer', icon: 'retry' },
+        });
+      }
+    }
+  }, []);
 
   useEffect(() => {
-    run();
-  }, [run]);
+    if (phase !== 'done' || !solution) {
+      return;
+    }
+    const cached = solution.explanation;
+    if (cached && cached.level === level) {
+      setEx({ status: 'done', via: cached.source, level, text: cached.text, report: cached.report });
+    } else if (!ex || ex.status === 'unavailable' || ex.level !== level) {
+      startExplain(solution, level);
+    }
+  }, [phase, solution?.result?.latex, level, modelTick]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Étape 8 : explication rédigée à partir des étapes vérifiées
-  useEffect(() => {
-    if (!result) return;
-    let cancelled = false;
-    setExplanation({ status: 'loading' });
-    const t0 = Date.now();
-    explainSolution(result)
-      .then(text => {
-        if (cancelled) return;
-        result.timings.push({ label: 'Explication (serveur)', ms: Date.now() - t0 });
-        setExplanation(text ? { status: 'done', text } : { status: 'error', text: 'escalade serveur désactivée' });
-      })
-      .catch(e => !cancelled && setExplanation({ status: 'error', text: e?.message ?? String(e) }));
-    return () => {
-      cancelled = true;
-    };
-  }, [result]);
+  useEffect(() => () => abort.current?.abort(), []);
 
-  const edit = () => navigation.navigate('Calculator', { initialLatex: result?.latex ?? latex });
+  const onAction = (action: string, value?: string | null) => {
+    switch (action) {
+      case 'edit':
+        navigation.navigate('Calculator', { initialLatex: solution?.latex ?? latex });
+        break;
+      case 'retry':
+        run();
+        break;
+      case 'verify-server':
+        run({ forceServer: true });
+        break;
+      case 'level':
+        if (value && value !== level) {
+          setLevel(value as Level);
+          updateSettings({ level: value as Level });
+        }
+        break;
+      case 'stop':
+        abort.current?.abort();
+        break;
+      case 'regenerate':
+        if (solution) {
+          startExplain({ ...solution, explanation: undefined }, level);
+        }
+        break;
+      case 'install-model':
+      case 'open-settings':
+        navigation.navigate('Settings');
+        break;
+    }
+  };
+
+  const docState: DocState = {
+    phase,
+    latex: solution?.latex ?? latex,
+    kindLabel: solution?.kindLabel,
+    progress,
+    error,
+    solution: solution ?? undefined,
+    explain: phase === 'done' ? ex : undefined,
+    canVerifyServer: phase === 'done' && solution?.route === 'local' && getSettings().allowServer && !!solution.apiType,
+    levels: LEVELS,
+  };
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Text style={styles.backButton}>← Retour</Text>
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Résolution</Text>
-        <TouchableOpacity onPress={edit}>
-          <Text style={styles.editButton}>Modifier</Text>
-        </TouchableOpacity>
-      </View>
-
-      <ScrollView contentContainerStyle={styles.scrollContent} scrollEnabled={scrollEnabled}>
-        <View style={styles.card}>
-          <Text style={styles.sectionLabel}>Énoncé {result?.kindLabel ? `· ${result.kindLabel}` : ''}</Text>
-          <MathRenderer math={result?.latex ?? latex} fontSize={20} />
-        </View>
-
-        {!result && !error && (
-          <View style={[styles.card, styles.center]}>
-            <ActivityIndicator color="#FF3B30" />
-            <Text style={styles.progress}>{progress}</Text>
-          </View>
-        )}
-
-        {error && (
-          <View style={[styles.card, styles.errorCard]}>
-            <Text style={[styles.sectionLabel, { color: '#FF453A' }]}>Échec</Text>
-            <Text style={styles.body}>{error.message}</Text>
-            <View style={styles.row}>
-              <TouchableOpacity style={styles.btn} onPress={run}>
-                <Text style={styles.btnText}>Réessayer</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.btn} onPress={edit}>
-                <Text style={styles.btnText}>Corriger le LaTeX</Text>
-              </TouchableOpacity>
-            </View>
-            <Attempts attempts={error.attempts} />
-            <Timings timings={error.timings} />
-          </View>
-        )}
-
-        {result && (
-          <>
-            <View style={[styles.card, styles.resultCard]}>
-              <Text style={[styles.sectionLabel, { color: '#34C759' }]}>Résultat</Text>
-              <MathRenderer math={result.resultLatex} color="#34C759" fontSize={22} />
-              {result.verified === false && <Text style={styles.warn}>⚠︎ Résultat non vérifié par le serveur</Text>}
-              {result.numericLatex ? (
-                <MathRenderer math={`\\approx ${result.numericLatex}`} color="#8E8E93" fontSize={16} />
-              ) : null}
-              <Text style={styles.routeText}>{ROUTE_LABELS[result.route]}</Text>
-            </View>
-
-            {result.steps.length > 0 && (
-              <>
-                <Text style={styles.sectionHeader}>Étapes (calculées par SymPy)</Text>
-                {result.steps.map((step, i) => (
-                  <View key={i} style={styles.stepCard}>
-                    <View style={styles.stepHeaderRow}>
-                      <View style={styles.stepBadge}>
-                        <Text style={styles.stepBadgeText}>{i + 1}</Text>
-                      </View>
-                      <Text style={styles.stepLabel}>{step.label}</Text>
-                    </View>
-                    <MathRenderer math={step.latex} fontSize={17} />
-                  </View>
-                ))}
-              </>
-            )}
-
-            {result.plot && (
-              <>
-                <Text style={styles.sectionHeader}>Graphe</Text>
-                <GraphView plot={result.plot} onGesture={active => setScrollEnabled(!active)} />
-                <Text style={styles.muted}>Glisser pour déplacer · pincer pour zoomer · toucher pour lire une valeur</Text>
-              </>
-            )}
-
-            <Text style={styles.sectionHeader}>Explication</Text>
-            <View style={styles.card}>
-              {explanation.status === 'loading' && (
-                <View style={styles.rowCenter}>
-                  <ActivityIndicator color="#8E8E93" size="small" />
-                  <Text style={styles.progress}>Rédaction de l'explication…</Text>
-                </View>
-              )}
-              {explanation.status === 'done' && explanation.text && (
-                <MathRenderer math={explanation.text} mode="text" fontSize={18} />
-              )}
-              {explanation.status === 'error' && (
-                <Text style={styles.muted}>
-                  Explication rédigée indisponible ({explanation.text}). Le LLM de raisonnement embarqué n'est pas
-                  encore intégré ; les étapes ci-dessus sont calculées et vérifiées par SymPy.
-                </Text>
-              )}
-            </View>
-
-            {result.code && (
-              <>
-                <TouchableOpacity onPress={() => setShowCode(!showCode)}>
-                  <Text style={styles.sectionHeader}>{showCode ? '▾' : '▸'} Code SymPy exécuté</Text>
-                </TouchableOpacity>
-                {showCode && (
-                  <CodeBlock
-                    code={result.code}
-                    onExportPy={() => toPythonFile(result)}
-                    onExportNotebook={() => toNotebook(result)}
-                  />
-                )}
-              </>
-            )}
-
-            {result.attempts.some(a => a.error) && <Attempts attempts={result.attempts.filter(a => a.error)} />}
-
-            <Timings timings={result.timings} warnings={result.warnings} />
-          </>
-        )}
-      </ScrollView>
+    <View style={{ flex: 1, backgroundColor: c.bg }}>
+      <StatusBar barStyle={scheme === 'dark' ? 'light-content' : 'dark-content'} backgroundColor={c.bg} />
+      <AppBar
+        title="Solution"
+        onBack={() => navigation.goBack()}
+        right={<IconButton icon={Pencil} label="Modifier la formule" onPress={() => onAction('edit')} />}
+      />
+      <SolutionDocument state={docState} onAction={onAction} />
     </View>
   );
 };
-
-const Attempts: React.FC<{ attempts: CodeAttempt[] }> = ({ attempts }) => {
-  const [open, setOpen] = useState(false);
-  if (!attempts.length) return null;
-  return (
-    <View style={{ marginTop: 12 }}>
-      <TouchableOpacity onPress={() => setOpen(!open)}>
-        <Text style={styles.sectionHeaderSmall}>
-          {open ? '▾' : '▸'} Tentatives en échec ({attempts.filter(a => a.error).length})
-        </Text>
-      </TouchableOpacity>
-      {open &&
-        attempts.map((a, i) => (
-          <View key={i} style={{ marginBottom: 10 }}>
-            <Text style={styles.muted}>
-              {a.source === 'template' ? 'Gabarit' : 'LLM'} — {a.error ?? 'ok'}
-            </Text>
-            <CodeBlock code={a.code} />
-          </View>
-        ))}
-    </View>
-  );
-};
-
-const Timings: React.FC<{ timings: Timing[]; warnings?: string[] }> = ({ timings, warnings }) => {
-  const total = timings.reduce((s, t) => s + t.ms, 0);
-  const st = MathEngine.status;
-  return (
-    <View style={styles.debugCard}>
-      <Text style={styles.sectionHeaderSmall}>Mesures</Text>
-      {timings.map((t, i) => (
-        <View key={i} style={styles.timingRow}>
-          <Text style={styles.timingLabel}>{t.label}</Text>
-          <Text style={styles.timingValue}>{t.ms} ms</Text>
-        </View>
-      ))}
-      <View style={styles.timingRow}>
-        <Text style={[styles.timingLabel, { fontWeight: '700' }]}>Total</Text>
-        <Text style={styles.timingValue}>{total} ms</Text>
-      </View>
-      <Text style={styles.muted}>
-        Python : {st.python}
-        {st.pythonLoadMs ? ` (chargé en ${st.pythonLoadMs} ms, ${st.pythonMode})` : ''} · OCR : {st.ocr}
-      </Text>
-      {warnings?.map((w, i) => (
-        <Text key={i} style={styles.muted}>
-          ⚠︎ {w}
-        </Text>
-      ))}
-    </View>
-  );
-};
-
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0A0A0C' },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingTop: 54,
-    paddingHorizontal: 16,
-    paddingBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.08)',
-  },
-  backButton: { color: '#FF3B30', fontSize: 16, fontWeight: '600' },
-  editButton: { color: '#8E8E93', fontSize: 15, fontWeight: '600' },
-  headerTitle: { color: '#FFF', fontSize: 16, fontWeight: '700' },
-  scrollContent: { padding: 16, paddingBottom: 48 },
-  card: {
-    backgroundColor: '#18181B',
-    borderRadius: 14,
-    padding: 14,
-    marginBottom: 14,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.06)',
-  },
-  center: { alignItems: 'center', gap: 10 },
-  resultCard: { backgroundColor: 'rgba(52, 199, 89, 0.08)', borderColor: 'rgba(52, 199, 89, 0.3)' },
-  errorCard: { borderColor: 'rgba(255, 69, 58, 0.4)' },
-  sectionLabel: {
-    color: '#8E8E93',
-    fontSize: 12,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
-    marginBottom: 6,
-  },
-  sectionHeader: { color: '#FFF', fontSize: 17, fontWeight: '700', marginTop: 8, marginBottom: 10 },
-  sectionHeaderSmall: { color: '#A1A1AA', fontSize: 13, fontWeight: '700', marginBottom: 8 },
-  routeText: { color: '#8E8E93', fontSize: 12, marginTop: 6, textAlign: 'center' },
-  progress: { color: '#D4D4D8', fontSize: 14 },
-  body: { color: '#E4E4E7', fontSize: 14, lineHeight: 20 },
-  muted: { color: '#8E8E93', fontSize: 12, lineHeight: 17, marginTop: 4 },
-  warn: { color: '#FF9F0A', fontSize: 13, textAlign: 'center', marginTop: 4 },
-  row: { flexDirection: 'row', gap: 10, marginTop: 12 },
-  rowCenter: { flexDirection: 'row', gap: 10, alignItems: 'center' },
-  btn: { paddingVertical: 8, paddingHorizontal: 14, borderRadius: 8, backgroundColor: 'rgba(255,255,255,0.1)' },
-  btnText: { color: '#FFF', fontSize: 13, fontWeight: '600' },
-  stepCard: {
-    backgroundColor: '#18181B',
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.06)',
-  },
-  stepHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 4 },
-  stepBadge: {
-    backgroundColor: '#FF3B30',
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  stepBadgeText: { color: '#FFF', fontSize: 12, fontWeight: '700' },
-  stepLabel: { color: '#E4E4E7', fontSize: 14, fontWeight: '600', flex: 1 },
-  debugCard: { marginTop: 18, padding: 12, borderRadius: 12, backgroundColor: '#111114' },
-  timingRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 2 },
-  timingLabel: { color: '#A1A1AA', fontSize: 12 },
-  timingValue: { color: '#D4D4D8', fontSize: 12, fontVariant: ['tabular-nums'] },
-});

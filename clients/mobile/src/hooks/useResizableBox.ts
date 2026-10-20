@@ -11,8 +11,8 @@ export interface BoundingBoxRect {
 export interface NormalizedCropRegion {
   originX: number; // [0, 1] relative to screen/preview
   originY: number; // [0, 1] relative to screen/preview
-  width: number;   // [0, 1]
-  height: number;  // [0, 1]
+  width: number; // [0, 1]
+  height: number; // [0, 1]
 }
 
 interface UseResizableBoxOptions {
@@ -22,6 +22,9 @@ interface UseResizableBoxOptions {
   initialHeight?: number;
   minWidth?: number;
   minHeight?: number;
+  /** zone utilisable : sous la barre du haut et au-dessus de la barre du bas (marges sûres comprises) */
+  topLimit?: number;
+  bottomLimit?: number;
   onRegionChange?: (region: NormalizedCropRegion) => void;
 }
 
@@ -32,11 +35,13 @@ export const useResizableBox = ({
   initialHeight = 140,
   minWidth = 140,
   minHeight = 80,
+  topLimit = 80,
+  bottomLimit = 120,
   onRegionChange,
 }: UseResizableBoxOptions) => {
-  // Center initial position
+  // Position initiale : centrée dans la zone utilisable, un peu au-dessus du milieu (là où l'œil vise)
   const initialX = (screenWidth - initialWidth) / 2;
-  const initialY = (screenHeight - initialHeight) / 2;
+  const initialY = Math.max(topLimit, topLimit + (screenHeight - topLimit - bottomLimit - initialHeight) * 0.42);
 
   const boxX = useSharedValue(initialX);
   const boxY = useSharedValue(initialY);
@@ -68,13 +73,13 @@ export const useResizableBox = ({
       startX.value = boxX.value;
       startY.value = boxY.value;
     })
-    .onUpdate((event) => {
+    .onUpdate(event => {
       const nextX = startX.value + event.translationX;
       const nextY = startY.value + event.translationY;
 
       // Bound checks
       boxX.value = Math.max(16, Math.min(screenWidth - boxWidth.value - 16, nextX));
-      boxY.value = Math.max(80, Math.min(screenHeight - boxHeight.value - 120, nextY));
+      boxY.value = Math.max(topLimit, Math.min(screenHeight - boxHeight.value - bottomLimit, nextY));
       notifyRegion();
     });
 
@@ -84,9 +89,9 @@ export const useResizableBox = ({
       startW.value = boxWidth.value;
       startH.value = boxHeight.value;
     })
-    .onUpdate((event) => {
+    .onUpdate(event => {
       const newWidth = Math.max(minWidth, Math.min(screenWidth - boxX.value - 16, startW.value + event.translationX));
-      const newHeight = Math.max(minHeight, Math.min(screenHeight - boxY.value - 120, startH.value + event.translationY));
+      const newHeight = Math.max(minHeight, Math.min(screenHeight - boxY.value - bottomLimit, startH.value + event.translationY));
       boxWidth.value = newWidth;
       boxHeight.value = newHeight;
       notifyRegion();
@@ -99,13 +104,13 @@ export const useResizableBox = ({
       startW.value = boxWidth.value;
       startH.value = boxHeight.value;
     })
-    .onUpdate((event) => {
+    .onUpdate(event => {
       const maxDeltaX = startW.value - minWidth;
       const deltaX = Math.max(-startX.value + 16, Math.min(maxDeltaX, event.translationX));
       boxX.value = startX.value + deltaX;
       boxWidth.value = startW.value - deltaX;
 
-      const newHeight = Math.max(minHeight, Math.min(screenHeight - boxY.value - 120, startH.value + event.translationY));
+      const newHeight = Math.max(minHeight, Math.min(screenHeight - boxY.value - bottomLimit, startH.value + event.translationY));
       boxHeight.value = newHeight;
       notifyRegion();
     });
@@ -117,9 +122,9 @@ export const useResizableBox = ({
       startW.value = boxWidth.value;
       startH.value = boxHeight.value;
     })
-    .onUpdate((event) => {
+    .onUpdate(event => {
       const maxDeltaY = startH.value - minHeight;
-      const deltaY = Math.max(-startY.value + 80, Math.min(maxDeltaY, event.translationY));
+      const deltaY = Math.max(-startY.value + topLimit, Math.min(maxDeltaY, event.translationY));
       boxY.value = startY.value + deltaY;
       boxHeight.value = startH.value - deltaY;
 
@@ -136,24 +141,21 @@ export const useResizableBox = ({
       startW.value = boxWidth.value;
       startH.value = boxHeight.value;
     })
-    .onUpdate((event) => {
+    .onUpdate(event => {
       const maxDeltaX = startW.value - minWidth;
       const deltaX = Math.max(-startX.value + 16, Math.min(maxDeltaX, event.translationX));
       boxX.value = startX.value + deltaX;
       boxWidth.value = startW.value - deltaX;
 
       const maxDeltaY = startH.value - minHeight;
-      const deltaY = Math.max(-startY.value + 80, Math.min(maxDeltaY, event.translationY));
+      const deltaY = Math.max(-startY.value + topLimit, Math.min(maxDeltaY, event.translationY));
       boxY.value = startY.value + deltaY;
       boxHeight.value = startH.value - deltaY;
       notifyRegion();
     });
 
   const animatedBoxStyle = useAnimatedStyle(() => ({
-    transform: [
-      { translateX: boxX.value },
-      { translateY: boxY.value },
-    ],
+    transform: [{ translateX: boxX.value }, { translateY: boxY.value }],
     width: boxWidth.value,
     height: boxHeight.value,
   }));

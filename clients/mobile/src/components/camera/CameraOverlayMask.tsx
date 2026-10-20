@@ -1,6 +1,7 @@
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import Animated, { SharedValue, useAnimatedStyle } from 'react-native-reanimated';
+import { camera } from '../../theme';
 
 interface CameraOverlayMaskProps {
   screenWidth: number;
@@ -11,14 +12,7 @@ interface CameraOverlayMaskProps {
   boxHeight: SharedValue<number>;
 }
 
-export const CameraOverlayMask: React.FC<CameraOverlayMaskProps> = ({
-  screenWidth,
-  screenHeight,
-  boxX,
-  boxY,
-  boxWidth,
-  boxHeight,
-}) => {
+export const CameraOverlayMask: React.FC<CameraOverlayMaskProps> = ({ screenWidth, boxX, boxY, boxWidth, boxHeight }) => {
   // Top mask
   const topStyle = useAnimatedStyle(() => ({
     top: 0,
@@ -31,8 +25,8 @@ export const CameraOverlayMask: React.FC<CameraOverlayMaskProps> = ({
   const bottomStyle = useAnimatedStyle(() => ({
     top: boxY.value + boxHeight.value,
     left: 0,
-    width: screenWidth,
-    height: Math.max(0, screenHeight - (boxY.value + boxHeight.value)),
+    right: 0,
+    bottom: 0,
   }));
 
   // Left mask
@@ -64,6 +58,6 @@ export const CameraOverlayMask: React.FC<CameraOverlayMaskProps> = ({
 const styles = StyleSheet.create({
   mask: {
     position: 'absolute',
-    backgroundColor: 'rgba(10, 10, 15, 0.62)',
+    backgroundColor: camera.mask,
   },
 });

@@ -1,170 +1,95 @@
+/**
+ * Feuille « Formule lue », au-dessus de la barre de la caméra : la formule reconnue, un avertissement si
+ * la lecture est incertaine, et deux actions (corriger, résoudre).
+ */
 import React from 'react';
-import { StyleSheet, View, Text, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { Pencil, X } from 'lucide-react-native';
+import { radius, space, type, useTheme } from '../../theme';
+import { Banner, Button, IconButton } from '../ui';
 import { MathRenderer } from './MathRenderer';
-import { getSettings } from '../../config';
 
-interface ScannedFormulaCardProps {
+interface Props {
   latex: string;
   isRecognizing: boolean;
-  info?: { confidence: number | null; model: string; ms: number } | null;
-  onEditInCalculator: (latex: string) => void;
+  /** confiance de l'OCR (0..1) et seuil sous lequel on prévient */
+  confidence: number | null;
+  threshold: number;
+  bottom: number;
+  onEdit: (latex: string) => void;
   onSolve: (latex: string) => void;
   onDismiss: () => void;
 }
 
-export const ScannedFormulaCard: React.FC<ScannedFormulaCardProps> = ({
+export const ScannedFormulaCard: React.FC<Props> = ({
   latex,
   isRecognizing,
-  info,
-  onEditInCalculator,
+  confidence,
+  threshold,
+  bottom,
+  onEdit,
   onSolve,
   onDismiss,
 }) => {
-  if (!latex && !isRecognizing) return null;
-
+  const { c } = useTheme();
+  if (!latex && !isRecognizing) {
+    return null;
+  }
+  const doubtful = confidence !== null && confidence < threshold;
   return (
-    <View style={styles.cardContainer}>
-      <View style={styles.headerRow}>
-        <Text style={styles.cardTitle}>Formule détectée</Text>
-        <TouchableOpacity onPress={onDismiss} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-          <Text style={styles.closeButton}>✕</Text>
-        </TouchableOpacity>
+    <View style={[styles.sheet, { bottom, backgroundColor: c.surface, shadowColor: '#000' }]} accessibilityViewIsModal={false}>
+      <View style={styles.head}>
+        <Text style={[type.titleSm, { color: c.text }]} accessibilityRole="header">
+          {isRecognizing ? 'Lecture de la formule…' : 'Formule lue'}
+        </Text>
+        {!isRecognizing ? <IconButton icon={X} label="Fermer" onPress={onDismiss} size={20} /> : null}
       </View>
-
-      <View style={styles.mathArea}>
-        {isRecognizing ? (
-          <View style={styles.loadingRow}>
-            <ActivityIndicator color="#FF3B30" size="small" />
-            <Text style={styles.loadingText}>Lecture de la formule…</Text>
-          </View>
-        ) : (
-          <MathRenderer
-            math={latex}
-            style={styles.mathView}
-            fontSize={18}
-          />
-        )}
-        {!isRecognizing && info && (
-          <Text style={styles.infoText}>
-            {info.model} · {info.ms} ms
-            {info.confidence != null ? ` · confiance ${(info.confidence * 100).toFixed(0)} %` : ''}
-          </Text>
-        )}
-        {!isRecognizing && info?.confidence != null && info.confidence < getSettings().ocrMinConfidence && (
-          <Text style={styles.warnText}>Confiance faible : vérifie la formule avant de résoudre.</Text>
-        )}
-      </View>
-
-      {!isRecognizing && latex.length > 0 && (
-        <View style={styles.actionsRow}>
-          <TouchableOpacity
-            style={styles.editButton}
-            onPress={() => onEditInCalculator(latex)}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.editButtonText}>✏️ Modifier</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.solveButton}
-            onPress={() => onSolve(latex)}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.solveButtonText}>Résoudre ➔</Text>
-          </TouchableOpacity>
+      {isRecognizing ? (
+        <View style={styles.loading}>
+          <ActivityIndicator color={c.primary} />
+          <Text style={[type.bodySm, { color: c.textMuted }]}>Sur ton téléphone, sans connexion.</Text>
         </View>
+      ) : (
+        <>
+          <View style={[styles.formula, { backgroundColor: c.bg, borderColor: c.line }]}>
+            <MathRenderer math={latex} fontSize={22} minHeight={48} />
+          </View>
+          {doubtful ? (
+            <Banner
+              tone="warning"
+              message="Lecture incertaine : vérifie la formule. En résolvant, je la ferai aussi contrôler par le serveur."
+              style={styles.banner}
+            />
+          ) : null}
+          <View style={styles.actions}>
+            <Button label="Corriger" icon={Pencil} variant="outlined" onPress={() => onEdit(latex)} style={styles.action} />
+            <Button label="Résoudre" onPress={() => onSolve(latex)} style={[styles.action, styles.primary]} />
+          </View>
+        </>
       )}
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  cardContainer: {
+  sheet: {
     position: 'absolute',
-    top: 96,
-    left: 16,
-    right: 16,
-    backgroundColor: 'rgba(25, 25, 30, 0.95)',
-    borderRadius: 16,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.15)',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.4,
-    shadowRadius: 12,
+    left: space.md,
+    right: space.md,
+    borderRadius: radius.lg,
+    padding: space.lg,
+    paddingTop: space.sm,
+    zIndex: 60,
     elevation: 8,
-    zIndex: 40,
+    shadowOpacity: 0.25,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 6 },
   },
-  headerRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  cardTitle: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#8E8E93',
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
-  },
-  closeButton: {
-    fontSize: 16,
-    color: '#8E8E93',
-    fontWeight: '600',
-  },
-  mathArea: {
-    minHeight: 60,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginVertical: 8,
-    paddingHorizontal: 8,
-  },
-  mathView: {
-    width: '100%',
-  },
-  infoText: { color: '#8E8E93', fontSize: 11, marginTop: 6, textAlign: 'center' },
-  warnText: { color: '#FF9F0A', fontSize: 12, marginTop: 4, textAlign: 'center' },
-  loadingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  loadingText: {
-    color: '#EBEBF5',
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  actionsRow: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    gap: 12,
-    marginTop: 12,
-    paddingTop: 10,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255, 255, 255, 0.1)',
-  },
-  editButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-    borderRadius: 8,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-  },
-  editButtonText: {
-    color: '#FFFFFF',
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  solveButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    backgroundColor: '#FF3B30',
-  },
-  solveButtonText: {
-    color: '#FFFFFF',
-    fontSize: 13,
-    fontWeight: '700',
-  },
+  head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 48 },
+  loading: { flexDirection: 'row', alignItems: 'center', gap: space.md, paddingVertical: space.lg },
+  formula: { borderRadius: radius.md, borderWidth: StyleSheet.hairlineWidth, paddingVertical: space.sm, paddingHorizontal: space.md },
+  banner: { marginTop: space.md },
+  actions: { flexDirection: 'row', gap: space.md, marginTop: space.lg },
+  action: { flex: 1 },
+  primary: { flex: 1.4 },
 });
