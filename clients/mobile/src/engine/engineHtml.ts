@@ -3,7 +3,7 @@
  *
  *  - CortexJS Compute Engine : validation du LaTeX, calcul exact des cas locaux, étapes, vérification
  *    des explications (mathSource.ts) ;
- *  - OCR pix2tex en ONNX INT8 sur onnxruntime-web (ocrSource.ts).
+ *  - OCR : deux lecteurs pix2text-mfr en ONNX INT8 sur onnxruntime-web (ocrSource.ts).
  *
  * Tout est lu dans l'APK. Protocole :
  *   RN -> page : window.__engine.request(id, method, params)

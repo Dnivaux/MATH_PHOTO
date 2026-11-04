@@ -265,6 +265,29 @@ serveur (TexTeller) ou à l'utilisateur. Au moins l'un des deux a raison sur 295
 case (TexTeller). Sans mise en forme commune, pix2text-mfr était à 0 % sur les limites et TexTeller à 70 % : on
 aurait écarté le meilleur modèle pour une question d'écriture. Les runs d'avant sont tagués `invalid`.
 
+**Quantization des lecteurs embarqués (sujet embarqué niveau 2).** Fichiers réellement embarqués, lus par
+`serving/ocr/trocr_onnx.py` (référence du JavaScript de l'app), CPU 4 fils :
+
+| Lecteur | Précision | Taille | Équivalence | Limites | Intégrales | p50 |
+|---|---|---|---|---|---|---|
+| pix2text-mfr | FP32 | 117,6 Mo | 95,3 % | 98,5 % | 86,6 % | 188 ms |
+| pix2text-mfr | FP16 | 59,2 Mo | 95,3 % | 98,5 % | 86,6 % | 205 ms |
+| pix2text-mfr | **INT8 dynamique (déployé)** | **32,0 Mo** | **95,7 %** | 100 % | 87,8 % | **85 ms** |
+| pix2text-mfr 1.5 | FP32 | 119,5 Mo | 89,7 % | 100 % | 72,0 % | 211 ms |
+| pix2text-mfr 1.5 | FP16 | 60,3 Mo | 89,7 % | 100 % | 72,0 % | 247 ms |
+| pix2text-mfr 1.5 | **INT8 dynamique (déployé)** | **32,5 Mo** | 87,7 % | 98,5 % | 68,3 % | **99 ms** |
+
+INT8 : taille ÷ 3,7, temps ÷ 2,2, sans perte pour la v1 (−2 points pour la 1.5). FP16 n'apporte rien sur CPU
+(pas de calcul float16 natif) et ne tourne pas en WASM : écarté. Runs MLflow `role = quantization`.
+
+**Dans l'app (4 novembre).** pix2tex remplacé par les deux lecteurs INT8 (65 Mo dans l'APK). Vote : les deux
+lectures sont comparées à l'écriture près (`ocrKey` : sans espaces, `\left`/`\right` ni accolades de
+regroupement). Banc : accord sur 267 images sur 300, toutes justes ; en cas de désaccord, relecture serveur
+(TexTeller) ou choix de l'utilisateur, les deux lectures affichées. JavaScript validé contre Python dans
+Chromium (`npm run harness`) : 22 lectures sur 24 identiques au caractère près, les 2 autres même formule ;
+0,6 à 1,1 s par lecteur en WASM sur un fil (PC). Sur les photos de test du collègue, là où pix2tex produisait
+du charabia, les deux lecteurs lisent juste.
+
 **Limites du banc.** Les 66 limites ne couvrent que trois familles (fraction rationnelle en x→∞ et en x→a,
 sin(kx)/x). Suites, limites à droite, ln, exp, racines restent à ajouter, et les vraies photos à prendre.
 
@@ -359,7 +382,7 @@ La seconde version s'aligne sur le dossier : pas de Python sur le téléphone, e
 | MLOps 3 | Prompt injection | 🟡 Partiel | Bac à sable dans un conteneur dédié (réseau interne seul, lecture seule, sans capability) + AST, liste blanche, rlimits, 9 tests d'attaque ; pas de Prompt Guard / Llama Guard |
 | MLOps 3 | Améliorations libres | 🟢 Fait en partie | Distillation, pruning, vérification déterministe des résultats |
 | Embarqué 1 | Packager un modèle | 🟢 Fait | OCR ONNX et LLM GGUF dans l'app Android |
-| Embarqué 2 | Quantizations comparées + meilleure déployée | 🟡 Partiel | Fait pour le LLM (sur CPU du PC, pas encore sur le téléphone). OCR : seulement INT8 dynamique, sans comparaison FP32 / FP16 / INT8 statique / QAT |
+| Embarqué 2 | Quantizations comparées + meilleure déployée | 🟡 Presque | LLM : F16 / Q8_0 / Q4_K_M. OCR : FP32 / FP16 / INT8 dynamique comparés, INT8 déployé (section 4.8). Reste : mesures sur le téléphone |
 
 Les éléments de la phase 3 non réalisés : YOLO, toute la chaîne OCR, décodage spéculatif, recherche r = 8 / 32,
 pruning du 1,5B, pruning de la largeur et du vocabulaire du 0,6B, AWQ du 7B, DAG Airflow (les étapes sont
@@ -381,8 +404,8 @@ fusion et renommage de l'app, baselines OCR sur images synthétiques, outil de m
    prunée et non prunée, Q4_K_M et Q8_0 (sujet embarqué niveau 2).
 3. **Photos de la planche** (50 formules) : `eval/ocr_bench.py` sur photos réelles, calibration du seuil de
    confiance (courbe exactitude / taux d'escalade).
-4. **OCR** : remplacer pix2tex par les deux pix2text-mfr dans l'app (export INT8, vote), élargir les limites
-   du banc (suites, x→0⁺, ln, exp, racines), puis comparaison FP32 / FP16 / INT8 dynamique / statique.
+4. **OCR** : ~~deux pix2text-mfr INT8 dans l'app, vote, comparaison FP32 / FP16 / INT8~~ (fait le 4 novembre).
+   Reste : élargir les limites du banc (suites, x→0⁺, ln, exp, racines), temps de lecture sur le téléphone.
 
 ### Priorité 2 : points de la grille MLOps encore à zéro
 

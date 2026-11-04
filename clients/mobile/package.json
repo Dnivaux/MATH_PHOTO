@@ -9,6 +9,7 @@
     "test": "jest",
     "lint": "eslint .",
     "engine-assets": "node scripts/engine-assets.mjs",
+    "harness": "node scripts/engine-assets.mjs && node scripts/build-harness.mjs && node scripts/run-harness.mjs",
     "apk": "node scripts/engine-assets.mjs && cd android && ./gradlew assembleRelease -PreactNativeArchitectures=arm64-v8a"
   },
   "dependencies": {

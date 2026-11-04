@@ -245,11 +245,11 @@ export const SettingsScreen: React.FC<Props> = ({ navigation }) => {
           <Row
             first
             title="Photo → Maths"
-            subtitle={`Version ${APP_VERSION} · OCR ${engine.ocrModel ?? 'pix2tex'} · CortexJS ${VERSIONS.cortex}`}
+            subtitle={`Version ${APP_VERSION} · OCR ${engine.ocrModel ?? 'pix2text-mfr'} · CortexJS ${VERSIONS.cortex}`}
           />
           <Row
             title="Licences"
-            subtitle="pix2tex (MIT), Qwen3 (Apache 2.0), llama.cpp (MIT), ONNX Runtime (MIT), CortexJS (MIT), KaTeX (MIT), MathLive (MIT), CMU Serif (OFL)"
+            subtitle="pix2text-mfr (MIT), Qwen3 (Apache 2.0), llama.cpp (MIT), ONNX Runtime (MIT), CortexJS (MIT), KaTeX (MIT), MathLive (MIT), CMU Serif (OFL)"
           />
           <Row
             title="Outils de développement"

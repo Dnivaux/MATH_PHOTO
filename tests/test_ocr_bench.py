@@ -35,3 +35,12 @@ def test_canonical_frames_and_limits():
     assert canonicalize(r"\int _ { } ^ { } x d x") == r"\int x d x"
     # un tableau à plusieurs cases n'est pas déballé
     assert canonicalize(r"\begin{array}{c}x\\y\end{array}") == r"\begin{array}{c}x\\y\end{array}"
+
+
+def test_trocr_detokenize():
+    """Détokenisation ByteLevel de pix2text-mfr (référence du JavaScript de l'app) : Ġ est l'espace."""
+    from serving.ocr.trocr_onnx import detokenize
+
+    assert detokenize(["<s>", "\\frac", "Ġ{", "Ġd", "Ġ}", "</s>"]) == r"\frac { d }"
+    assert detokenize(["x", "Ġ^", "Ġ{", "Ġ2", "Ġ}", "<pad>"]) == "x ^ { 2 }"
+    assert detokenize(["Ã©"]) == "é"  # octets UTF-8 sur deux caractères

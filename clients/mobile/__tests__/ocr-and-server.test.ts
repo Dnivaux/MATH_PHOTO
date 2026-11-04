@@ -77,3 +77,30 @@ describe('lecture OCR inexploitable : jamais montrée telle quelle', () => {
     expect(looksGarbled(latex)).toBe(false);
   });
 });
+
+describe('sorties réelles de pix2text-mfr (banc du 4 novembre) -> LaTeX que le moteur comprend', () => {
+  const { ComputeEngine } = require('@cortex-js/compute-engine');
+  const { MATH_SOURCE } = require('../src/engine/mathSource');
+  // eslint-disable-next-line no-new-func
+  const math = new Function(`${MATH_SOURCE}; return makeMath;`)()(() => new ComputeEngine());
+  test.each([
+    ['\\underset { \\mathrm { x \\to 0 } } { \\operatorname* { l i m } } \\, \\frac { \\operatorname { s i n } { \\left( 7 x \\right) } } { x }', // \u : pas de String.raw (séquence d'échappement)
+      String.raw`\lim_{x\to 0}\frac{\sin {\left(7x\right)}}{x}`, 'limit'],
+    [String.raw`= \operatorname* { l i m } _ { x \to \infty } { \frac { - 2 x ^ { 3 } + 4 x - 4 } { 3 x ^ { 3 } + x ^ { 2 } + 4 x + 5 } }`,
+      String.raw`\lim_{x\to \infty}{\frac{-2x^{3}+4x-4}{3x^{3}+x^{2}+4x+5}}`, 'limit'],
+    [String.raw`\frac { \mathrm { d } } { \mathrm { d } x } ( - 3 \operatorname { s i n } { ( x ) } + \frac { \operatorname { c o s } { ( 2 x ) } } { 2 } )`,
+      String.raw`\frac{d}{dx}(-3\sin {(x)}+\frac{\cos {(2x)}}{2})`, 'derivative'],
+    [String.raw`\frac { d } { d x } ( 4 \mathsf { c o s } \left( x \right) + 4 \mathsf { c o s } \left( 3 x \right) )`,
+      String.raw`\frac{d}{dx}(4\cos \left(x\right)+4\cos \left(3x\right))`, 'derivative'],
+    [String.raw`\frac { d } { d x } \bigl ( \frac { x ^ { 4 } } { 2 } + \frac { \operatorname { s i n } { ( 2 x ) } } { 2 } \bigr )`,
+      String.raw`\frac{d}{dx}(\frac{x^{4}}{2}+\frac{\sin {(2x)}}{2})`, 'derivative'],
+    [String.raw`\int _ { } ^ { } ( x \mathrm { e } ^ { 3 x } - x \mathrm { s i n } \left( x \right) + x \mathrm { c o s } \left( x \right) ) d x`,
+      String.raw`\int(xe^{3x}-x\sin \left(x\right)+x\cos \left(x\right))dx`, 'integral'],
+    [String.raw`x ^ { 2 } - 5 x + 6 = 0`, 'x^{2}-5x+6=0', 'equation'],
+  ])('%s', (raw, expected, kind) => {
+    const latex = normalizeOcrLatex(raw);
+    expect(latex).toBe(expected);
+    expect(looksGarbled(latex)).toBe(false);
+    expect(math.analyze(latex).kind).toBe(kind);
+  });
+});

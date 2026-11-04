@@ -2,14 +2,15 @@
 /**
  * Copie dans l'APK (android/app/src/main/assets/engine/) tout ce que les WebView utilisent, pour un
  * fonctionnement 100 % hors ligne. Aucun téléchargement : les fichiers viennent de node_modules (versions
- * figées par package-lock.json) et de l'export ONNX de pix2tex.
+ * figées par package-lock.json) et de l'export ONNX des lecteurs OCR.
  *
  *   - CortexJS (calcul exact)            - onnxruntime-web 1.18 (WASM, sans module ES)
  *   - KaTeX (rendu des formules)         - MathLive (éditeur de la calculatrice)
- *   - CMU Serif (texte des explications) - modèle OCR pix2tex INT8 (~38 Mo)
+ *   - CMU Serif (texte des explications) - OCR : pix2text-mfr v1 et 1.5 en INT8 (~65 Mo)
  *
- * Modèle OCR : produit par `uv run export_onnx.py` (dossier scripts/pix2tex/). Le dossier onnx/ est
- * cherché dans PIX2TEX_DIR, puis aux emplacements habituels.
+ * Lecteurs OCR : produits par `.venv-ocr/bin/python clients/mobile/scripts/p2t_mfr/export.py` (depuis la racine
+ * du dépôt). Le dossier onnx/ (readers.json + un dossier par lecteur) est cherché dans OCR_DIR, puis dans
+ * scripts/p2t_mfr/onnx.
  *
  * Usage : npm run engine-assets
  */
@@ -23,11 +24,7 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const OUT = join(ROOT, 'android/app/src/main/assets/engine');
 const NM = join(ROOT, 'node_modules');
 
-const PIX2TEX_CANDIDATES = [
-  process.env.PIX2TEX_DIR,
-  join(ROOT, 'scripts/pix2tex/onnx'),
-  join(ROOT, '../../models/pix2tex/onnx'), // copie de travail projet_MLops
-].filter(Boolean);
+const OCR_CANDIDATES = [process.env.OCR_DIR, join(ROOT, 'scripts/p2t_mfr/onnx')].filter(Boolean);
 
 let total = 0;
 
@@ -47,7 +44,7 @@ async function sha256(p) {
 async function main() {
   console.log(`Fichiers embarqués -> ${OUT}`);
   // anciens moteurs (Pyodide, transformers.js, Texo) : retirés de l'APK
-  for (const old of ['pyodide', 'transformers', 'models/texo']) await rm(join(OUT, old), { recursive: true, force: true });
+  for (const old of ['pyodide', 'transformers', 'models/texo', 'models/pix2tex', 'models/ocr']) await rm(join(OUT, old), { recursive: true, force: true });
 
   console.log('CortexJS');
   await put(join(NM, '@cortex-js/compute-engine/dist/compute-engine.min.umd.js'), 'cortex/compute-engine.min.umd.js');
@@ -73,22 +70,27 @@ async function main() {
   }
   await put(join(NM, 'computer-modern/OFL.txt'), 'fonts/OFL.txt');
 
-  console.log('Modèle OCR pix2tex');
-  const dir = PIX2TEX_CANDIDATES.map(p => resolve(p)).find(p => existsSync(join(p, 'config.json')));
+  console.log('Lecteurs OCR');
+  const dir = OCR_CANDIDATES.map(p => resolve(p)).find(p => existsSync(join(p, 'readers.json')));
   if (!dir) {
     throw new Error(
-      `export ONNX de pix2tex introuvable (cherché : ${PIX2TEX_CANDIDATES.join(', ')}).\n` +
-        'Lancer `uv run export_onnx.py` dans scripts/pix2tex, ou définir PIX2TEX_DIR.',
+      `export ONNX des lecteurs OCR introuvable (cherché : ${OCR_CANDIDATES.join(', ')}).\n` +
+        'Lancer `.venv-ocr/bin/python clients/mobile/scripts/p2t_mfr/export.py` à la racine du dépôt, ou définir OCR_DIR.',
     );
   }
-  const cfg = JSON.parse(await readFile(join(dir, 'config.json'), 'utf8'));
-  for (const f of [cfg.encoder, cfg.decoder, cfg.resizer]) {
-    const expected = cfg.files?.[f]?.sha256;
-    if (expected && (await sha256(join(dir, f))) !== expected) throw new Error(`${f} : empreinte SHA-256 différente de config.json`);
-    await put(join(dir, f), `models/pix2tex/${f}`);
+  const { readers } = JSON.parse(await readFile(join(dir, 'readers.json'), 'utf8'));
+  for (const name of readers) {
+    const cfg = JSON.parse(await readFile(join(dir, name, 'config.json'), 'utf8'));
+    for (const f of [cfg.encoder, cfg.decoder]) {
+      const expected = cfg.files?.[f]?.sha256;
+      if (expected && (await sha256(join(dir, name, f))) !== expected) {
+        throw new Error(`${name}/${f} : empreinte SHA-256 différente de config.json`);
+      }
+      await put(join(dir, name, f), `models/ocr/${name}/${f}`);
+    }
+    for (const f of ['vocab.json', 'config.json']) await put(join(dir, name, f), `models/ocr/${name}/${f}`);
   }
-  await put(join(dir, 'vocab.json'), 'models/pix2tex/vocab.json');
-  await put(join(dir, 'config.json'), 'models/pix2tex/config.json');
+  await put(join(dir, 'readers.json'), 'models/ocr/readers.json');
 
   console.log(`OK : ${(total / 1e6).toFixed(0)} Mo embarqués`);
 }

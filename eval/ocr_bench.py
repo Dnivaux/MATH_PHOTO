@@ -153,11 +153,14 @@ MODELS = {"pix2tex": "pix2tex", "texteller": "texteller",
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--model", choices=sorted(MODELS), required=True)
+    ap.add_argument("--model", choices=sorted(MODELS), help="modèle de référence (sinon --onnx)")
     ap.add_argument("--data", required=True, help="dossier avec labels.jsonl")
     ap.add_argument("--device", default="cuda")
     ap.add_argument("--limit", type=int, default=None)
     ap.add_argument("--threads", type=int, default=4, help="ONNX Runtime sur CPU (modèles p2t-mfr)")
+    ap.add_argument("--onnx", type=Path, default=None,
+                    help="dossier d'un lecteur exporté pour l'app (clients/mobile/scripts/p2t_mfr/export.py)")
+    ap.add_argument("--variant", default="int8", choices=["fp32", "fp16", "int8"], help="avec --onnx")
     args = ap.parse_args()
 
     data = Path(args.data)
@@ -165,7 +168,23 @@ def main() -> None:
     labels = [l for l in labels if (data / l["file"]).exists()][: args.limit]
     if not labels:
         raise SystemExit(f"aucune image étiquetée trouvée dans {data}")
-    if args.model == "pix2tex":
+    confidence = None
+    if args.onnx:
+        from serving.ocr.trocr_onnx import TrOCROnnx
+
+        reader = TrOCROnnx(args.onnx, args.variant, args.threads)
+        args.model, args.device = f"{reader.cfg['name']}-{args.variant}", f"cpu-onnx-{args.threads}t"
+        last: dict[str, float] = {}
+
+        def predict(img):
+            raw, last["c"] = reader.read(img)
+            return raw
+
+        def confidence():
+            return last.get("c")
+    elif not args.model:
+        raise SystemExit("--model ou --onnx est requis")
+    elif args.model == "pix2tex":
         predict = load_pix2tex()
     elif args.model == "texteller":
         predict = load_texteller(args.device)
@@ -186,7 +205,7 @@ def main() -> None:
         pred = canonicalize(raw)  # même mise en forme pour tous les modèles (et pour le serveur)
         ms = (time.perf_counter() - t) * 1e3
         ref_t, pred_t = tokens(l["latex"]), tokens(pred)
-        rows.append({**l, "pred": pred, "pred_raw": raw, "ms": ms, "exact": normalize(pred) == normalize(l["latex"]),
+        rows.append({**l, "pred": pred, "pred_raw": raw, "ms": ms, "confidence": confidence() if confidence else None, "exact": normalize(pred) == normalize(l["latex"]),
                      "equivalent": equivalent(pred, l["latex"]),
                      "token_error_rate": edit_distance(pred_t, ref_t) / max(1, len(ref_t))})
 
@@ -204,8 +223,15 @@ def main() -> None:
 
     tracking.init()
     with mlflow.start_run(run_name=f"ocr-{args.model}-{data.name}"):
-        mlflow.set_tags({"stage": "eval", "task": "ocr", "role": "baseline", "model": args.model, "dataset": data.name})
-        mlflow.log_params({"model": args.model, "data": str(data), "device": args.device})
+        mlflow.set_tags({"stage": "eval", "task": "ocr", "role": "quantization" if args.onnx else "baseline",
+                         "model": args.model, "dataset": data.name})
+        params = {"model": args.model, "data": str(data), "device": args.device}
+        if args.onnx:
+            files = reader.cfg["variants"][args.variant]
+            size = sum(reader.cfg["files"][files[k]]["bytes"] for k in ("encoder", "decoder"))
+            params |= {"variant": args.variant, "onnx_dir": str(args.onnx), "revision": reader.cfg["revision"]}
+            mlflow.log_metric("model_mb", size / 1e6)
+        mlflow.log_params(params)
         mlflow.log_metrics(metrics)
         with tempfile.TemporaryDirectory() as tmp:
             p = Path(tmp) / "ocr_predictions.jsonl"

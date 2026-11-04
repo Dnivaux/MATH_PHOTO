@@ -19,13 +19,13 @@
 <body>
 <h1>Banc du moteur embarqué</h1>
 <div id="status">Chargement…</div>
-<h2>OCR pix2tex (JavaScript) face à la référence Python</h2>
-<table id="ocr"><tr><th>Image</th><th>Attendu</th><th>Python</th><th>JavaScript</th><th>Conf. JS</th><th>ms</th></tr></table>
+<h2>OCR pix2text-mfr (JavaScript) face à la référence Python (serving/ocr/trocr_onnx.py)</h2>
+<table id="ocr"><tr><th>Image</th><th>Attendu</th><th>Lecteur</th><th>Python</th><th>JavaScript</th><th>Conf. JS (Python)</th><th>ms</th></tr></table>
 <h2>Analyse et vérification</h2>
 <div id="log"></div>
 <script>
   window.__allowNetwork = true;            // banc servi en HTTP : fetch() natif autorisé
-  window.__OCR_BASE = '../../android/app/src/main/assets/engine/models/pix2tex/';
+  window.__OCR_BASE = '../../android/app/src/main/assets/engine/models/ocr/';
   window.__ORT_BASE = '../../android/app/src/main/assets/engine/ort/';
   window.__enginePost = function (m) { if (m.type === 'status') document.getElementById('status').textContent = JSON.stringify(m); };
   window.__results = { ocr: [], math: [] };
@@ -51,20 +51,26 @@
   for (var s of samples) {
     var blob = await (await fetch('samples/' + s.file)).blob();
     var b64 = await new Promise(function (res) { var fr = new FileReader(); fr.onload = function () { res(String(fr.result).split(',')[1]); }; fr.readAsDataURL(blob); });
-    var t0 = performance.now();
     var r = await OCR.recognize({ imageBase64: b64, mime: 'image/png' });
-    var ms = Math.round(performance.now() - t0);
-    var same = r.raw === s.python;
-    window.__results.ocr.push({ file: s.file, expected: s.latex, python: s.python, js: r.raw, same: same, conf: r.confidence, ms: ms });
-    var tr = document.createElement('tr');
-    tr.innerHTML = '<td><img src="samples/' + s.file + '"><br>' + s.file + '</td><td><code></code></td><td><code></code></td><td><code></code> <span class="' + (same ? 'ok' : 'bad') + '">' + (same ? '= Python' : '≠ Python') + '</span></td><td>' + r.confidence + ' (py ' + s.confidence + ')</td><td>' + ms + '</td>';
-    var codes = tr.querySelectorAll('code');
-    codes[0].textContent = s.latex; codes[1].textContent = s.python; codes[2].textContent = r.raw;
-    t.appendChild(tr);
+    r.readings.forEach(function (rd, i) {
+      var same = rd.raw === s.python[i];
+      window.__results.ocr.push({ file: s.file, reader: rd.model, expected: s.latex, python: s.python[i], js: rd.raw, same: same,
+        conf: rd.confidence, pyConf: s.confidence[i], ms: rd.ms });
+      var tr = document.createElement('tr');
+      tr.innerHTML = '<td>' + (i ? '' : '<img src="samples/' + s.file + '"><br>' + s.file) + '</td><td><code></code></td><td>' + rd.model +
+        '</td><td><code></code></td><td><code></code> <span class="' + (same ? 'ok' : 'bad') + '">' + (same ? '= Python' : '≠ Python') +
+        '</span></td><td>' + rd.confidence + ' (' + s.confidence[i] + ')</td><td>' + rd.ms + '</td>';
+      var codes = tr.querySelectorAll('code');
+      codes[0].textContent = i ? '' : s.latex; codes[1].textContent = s.python[i]; codes[2].textContent = rd.raw;
+      t.appendChild(tr);
+    });
   }
   window.__results.done = true;
   document.getElementById('status').textContent = 'Terminé';
-})().catch(function (e) { document.getElementById('status').textContent = 'ERREUR ' + e.message; window.__results.error = String(e); });
+})().catch(function (e) { document.getElementById('status').textContent = 'ERREUR ' + e.message; window.__results.error = String(e); })
+  .then(function () {  // lancé par scripts/run-harness.mjs : renvoie les résultats au serveur du banc
+    if (location.search.indexOf('report=1') >= 0) fetch('/__results', { method: 'POST', body: JSON.stringify(window.__results) });
+  });
 </script>
 </body>
 </html>

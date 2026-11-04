@@ -133,6 +133,21 @@ Tous les runs d'avant sont tagués `invalid`. Tests : `tests/test_ocr_bench.py`.
 
 Limite : 3 familles de limites seulement dans le banc ; vraies photos pas encore prises.
 
+### OCR dans l'app : pix2text-mfr v1 + 1.5 INT8 (4 novembre)
+
+- Export : `clients/mobile/scripts/p2t_mfr/export.py` (révisions Hugging Face figées, FP32 / FP16 / INT8, SHA-256
+  dans `config.json`, reproductible au bit près). Référence Python : `serving/ocr/trocr_onnx.py`, identique à
+  transformers sur 20 images sur 20.
+- Quantization (300 images) : v1 INT8 95,7 % pour 32 Mo et 85 ms, contre 95,3 % / 118 Mo / 188 ms en FP32 ;
+  1.5 INT8 87,7 % (FP32 89,7 %). FP16 : même précision que FP32, pas plus rapide sur CPU, écarté.
+- App : `ocrSource.ts` réécrit (bicubique type Pillow, décodeur sans cache, détokenisation ByteLevel), deux
+  lecteurs l'un après l'autre ; `ocrKey` compare les lectures ; désaccord → serveur, sinon les deux lectures
+  proposées (« Prendre celle-ci »). `normalizeOcrLatex` reprend les règles de `canonicalize` : les 600 lectures
+  justes du banc sont toutes comprises par CortexJS avec le bon type.
+- Banc navigateur : `npm run harness` (Chromium sans écran) : 22/24 identiques à Python, 24/24 même formule.
+- CI (`apk.yml`) : export INT8 au lieu de pix2tex. APK : 142 Mo.
+- À faire : temps de lecture sur le S24 Ultra (deux lecteurs en série, ~1,5 s sur PC).
+
 ---
 
 ## Premier test sur téléphone (S24 Ultra, 4 novembre)
@@ -160,8 +175,8 @@ Relancer : `make up` (tout), ou `make infra-up` seul pour entraîner. Gateway su
 2. Mesures sur le téléphone (`eval/device_bench.py`) : non prunée (champion) et prunée, Q4_K_M et Q8_0.
 3. Photos de la planche (`data/ocr/real/planche_a_imprimer.pdf`, 50 formules) → `eval/ocr_bench.py` sur `data/ocr/real`,
    calibration du seuil de confiance (0,9 laisse passer des lectures fausses).
-4. OCR : pix2text-mfr v1 + 1.5 dans l'app (export INT8, décodeur TrOCR dans `ocrSource.ts`, même mise en forme
-   que `serving/ocr/text.py` côté TypeScript, vote). Élargir le générateur de limites (suites, x→0⁺, ln, exp, racines).
+4. OCR : tester sur le téléphone (temps des deux lecteurs, vote). Élargir le générateur de limites (suites, x→0⁺,
+   ln, exp, racines).
 
 ### Priorité 2 (grille MLOps)
 - Déploiement automatique sur une VM (runner auto-hébergé + `make up`), puis Terraform `libvirt` (demande sudo, IOMMU).

@@ -143,10 +143,22 @@ export function normalizeOcrLatex(raw: string): string {
     }
     s += t;
   }
-  for (const cmd of ['\\boldsymbol', '\\mathbf', '\\bm', '\\mathit', '\\boxed', '\\mathrm', '\\textbf', '\\pmb']) {
+  // \operatorname*{lim}, \mathrm{sin}, \mathsf{cos} (pix2text-mfr) : la fonction, avant de déballer \mathrm
+  s = s.replace(/\\(operatorname\*?|mathrm|mathsf|text|mathit)\{([a-z]+)\}/g, (m, _c, name) =>
+    OPERATORS.includes(name) ? `\\${name} ` : m,
+  );
+  // une seule lettre en gras ou droite : la lettre elle-même (\frac{\mathrm{d}}{\mathrm{d}x} -> \frac{d}{dx})
+  s = s.replace(/\\(mathrm|mathsf|mathit|boldsymbol|mathbf|bm)\{([a-zA-Z0-9])\}/g, '$2');
+  for (const cmd of ['\\boldsymbol', '\\mathbf', '\\bm', '\\mathit', '\\boxed', '\\mathrm', '\\mathsf', '\\textbf', '\\pmb']) {
     s = unwrap(s, cmd);
   }
-  s = s.replace(/\\operatorname\*?\{([a-z]+)\}/g, (m, name) => (OPERATORS.includes(name) ? `\\${name}` : m));
+  s = undersetLimit(s);
+  s = s.replace(/\\(limits|mathstrut|tiny|small|large|Large|LARGE|huge|hline)(?![a-zA-Z])/g, '');
+  s = s.replace(/\\[bB]igg?[lrm]?(?![a-zA-Z])/g, ''); // \bigl( -> (
+  s = s.replace(/\\[dt]frac(?![a-zA-Z])/g, '\\frac');
+  s = s.replace(/\\int_\{\}(\^\{\})?/g, '\\int'); // bornes vides
+  s = s.replace(/^\s*=\s*/, ''); // une formule ne commence pas par =
+  s = s.replace(/(\\[a-zA-Z]+) +([_^])/g, '$1$2'); // \lim _{x\to 0} -> \lim_{x\to 0}
   s = s.replace(/\\(rarr|rightarrow|longrightarrow|to)(?![a-zA-Z])/g, '\\to ');
   // tableau d'une seule ligne : on retire l'environnement
   const arr = s.match(/^\\begin\{(array|aligned|gathered)\}(\{[^}]*\})?(.*)\\end\{\1\}$/);
@@ -172,6 +184,26 @@ export function normalizeOcrLatex(raw: string): string {
   return cleanLatex(s);
 }
 
+/** \underset{x\to 0}{\lim} (pix2text-mfr 1.5) -> \lim_{x\to 0} */
+function undersetLimit(s: string): string {
+  let out = s;
+  for (let guard = 0; guard < 10; guard++) {
+    const idx = out.indexOf('\\underset{');
+    if (idx < 0) {
+      break;
+    }
+    const below = readGroup(out, idx + '\\underset'.length);
+    const op = below && readGroup(out, below.end);
+    if (!below || !op || !/^\s*\{?\s*\\lim\s*\}?\s*$/.test(op.content)) {
+      break;
+    }
+    const inner = readGroup(below.content, 0);
+    const sub = inner && inner.end === below.content.length ? inner.content : below.content;
+    out = out.slice(0, idx) + `\\lim_{${sub}}` + out.slice(op.end);
+  }
+  return out;
+}
+
 /**
  * Commandes qui n'apparaissent jamais dans un exercice du périmètre (collège à début du supérieur) mais que
  * pix2tex produit quand il ne sait pas lire : polices exotiques, accents sur des capitales, boîtes et
@@ -191,4 +223,61 @@ export function looksGarbled(latex: string): boolean {
   }
   // indices ou exposants vides ou réduits à un signe : x_{*}, {2-}^{2-}
   return /[_^]\{\s*[*+\-−]?\s*\}|[_^]\{\s*\d*[-+*]\s*\}/.test(s);
+}
+
+/** Commandes dont les accolades délimitent un argument (à garder pour comparer) */
+const GROUP_ARGS: Record<string, number> = {
+  '\\frac': 2,
+  '\\sqrt': 1,
+  '\\binom': 2,
+  '\\begin': 1,
+  '\\end': 1,
+  '\\operatorname': 1,
+  '\\mathrm': 1,
+  '\\text': 1,
+};
+
+function ungroup(s: string): string {
+  let out = '';
+  let want = 0;
+  for (let i = 0; i < s.length;) {
+    const c = s[i];
+    if (c === '\\') {
+      const cmd = (s.slice(i).match(/^\\[a-zA-Z]+|^\\./) ?? ['\\'])[0];
+      out += cmd;
+      i += cmd.length;
+      want = GROUP_ARGS[cmd] ?? 0;
+    } else if (c === '^' || c === '_') {
+      out += c;
+      i++;
+      want = 1;
+    } else if (c === '{') {
+      const g = readGroup(s, i);
+      if (!g) {
+        return out + s.slice(i);
+      }
+      const inner = ungroup(g.content);
+      i = g.end;
+      if (want > 0) {
+        out += inner.length === 1 ? inner : `{${inner}}`;
+        want--;
+      } else {
+        out += inner;
+      }
+    } else {
+      want = 0;
+      out += c;
+      i++;
+    }
+  }
+  return out;
+}
+
+/**
+ * Clé de comparaison de deux lectures OCR déjà normalisées : sans espaces, sans \left / \right ni accolades de
+ * regroupement (x^{2} et x^2, {\cos(x)} et \cos(x) donnent la même clé ; \frac{ab}{c} et \frac{a}{bc} non).
+ * Banc OCR : quand les deux lecteurs du téléphone ont la même clé (267 images sur 300), la lecture est juste.
+ */
+export function ocrKey(latex: string): string {
+  return ungroup((latex || '').replace(/\\(left|right)(?![a-zA-Z])/g, '').replace(/\s+/g, ''));
 }

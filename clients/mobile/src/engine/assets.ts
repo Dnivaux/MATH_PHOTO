@@ -1,6 +1,6 @@
 /**
  * Fichiers embarqués dans l'APK (android/app/src/main/assets/engine/), copiés par `npm run engine-assets`
- * depuis node_modules et depuis l'export ONNX de pix2tex. Les WebView sont chargées avec ce dossier comme
+ * depuis node_modules et depuis l'export ONNX des lecteurs OCR (scripts/p2t_mfr). Les WebView sont chargées avec ce dossier comme
  * baseUrl : tout fonctionne hors ligne, et aucune page ne charge de script distant.
  */
 export const ASSET_BASE = 'file:///android_asset/engine/';
@@ -19,7 +19,7 @@ export const LOCAL = {
   katex: 'katex/',
   mathlive: 'mathlive/',
   fonts: 'fonts/',
-  ocr: 'models/pix2tex/',
+  ocr: 'models/ocr/',
 };
 
 /**

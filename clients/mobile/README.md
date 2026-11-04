@@ -5,7 +5,7 @@ Client mobile de Photo → Maths, aligné sur le dossier projet (« Version tél
 | Étape | Sur le téléphone | Détail |
 |---|---|---|
 | Photo | `react-native-vision-camera`, cadre redimensionnable, galerie avec recadrage | photo ~2 Mpx, elle ne quitte pas le téléphone |
-| OCR | **pix2tex** (MIT) exporté en ONNX, poids INT8, sur onnxruntime-web (WASM) | 32 Mo, score de confiance par formule |
+| OCR | **pix2text-mfr v1 et 1.5** (MIT), ONNX INT8 sur onnxruntime-web (WASM) ; les deux lecteurs votent | 65 Mo ; 95,7 % de formules justes au banc OCR (v1), accord des deux lecteurs : 267/300, toutes justes |
 | Cas simples | **CortexJS** : arithmétique, fractions, puissances, racines, équation du premier degré | exact, hors ligne, étapes au format du générateur du serveur |
 | Cas complexes | gateway `POST /v1/solve` : second degré, systèmes, dérivées, primitives, limites | hors ligne : mis en file d'attente, envoyés au retour du réseau |
 | Explication | **LLM de raisonnement** Qwen3-0.6B distillé (GGUF Q4_K_M) via `llama.rn` | mode complet ; en mode léger `POST /v1/explain` |
@@ -27,13 +27,14 @@ Prérequis : Node 18+, JDK 17, SDK Android (platform 34, build-tools 34.0.0, NDK
 
 ```bash
 npm install
-(cd scripts/pix2tex && uv run export_onnx.py)   # une fois : poids pix2tex -> ONNX INT8, validé contre PyTorch
-npm run engine-assets                            # copie ~45 Mo dans android/app/src/main/assets/engine/
+(cd ../.. && .venv-ocr/bin/python clients/mobile/scripts/p2t_mfr/export.py)  # une fois : lecteurs OCR -> ONNX INT8
+npm run engine-assets                            # copie ~78 Mo dans android/app/src/main/assets/engine/
+npm run harness                                  # facultatif : OCR JavaScript face à la référence Python (Chromium)
 cd android && ./gradlew assembleRelease -PreactNativeArchitectures=arm64-v8a
 adb install -r app/build/outputs/apk/release/app-release.apk
 ```
 
-`npm run engine-assets` copie depuis `node_modules` (versions figées) et depuis l'export pix2tex : CortexJS,
+`npm run engine-assets` copie depuis `node_modules` (versions figées) et depuis l'export des lecteurs OCR : CortexJS,
 onnxruntime-web, KaTeX, MathLive, CMU Serif (police des explications) et le modèle OCR. Aucune page ne charge de
 script distant.
 
@@ -78,18 +79,18 @@ src/theme/             tokens (clair / sombre), contrastes AA vérifiés
 src/components/ui/     en-tête, boutons, puces, bandeaux, snackbar (Material 3)
 src/engine/            moteur embarqué (WebView cachée)
   mathSource.ts          analyse, calcul exact, étapes, vérification des explications (CortexJS)
-  ocrSource.ts           OCR pix2tex : éclairage, rééchantillonnage identique à Pillow, décodage glouton
+  ocrSource.ts           OCR pix2text-mfr : éclairage, rééchantillonnage identique à Pillow, décodage glouton, deux lecteurs
 src/explain/           explainer : prompt, modèle (téléchargement, SHA-256), llama.rn
 src/pipeline/          résolution, explication, file d'attente hors ligne
 src/components/solution/ page de solution (une WebView : résultat encadré, démarche, graphe, explication)
 src/storage/db.ts      SQLite
-scripts/pix2tex/       export ONNX de pix2tex et images de test
+scripts/p2t_mfr/       export ONNX des lecteurs OCR (FP32 / FP16 / INT8) et références du banc navigateur
+scripts/pix2tex/       ancien OCR (pix2tex, 17 % au banc), gardé pour comparaison
 ```
 
 ## Limites connues
 
-- pix2tex de départ, non fine-tuné sur des photos : il se trompe sur les photos difficiles, mais sa confiance
-  baisse alors, ce qui déclenche le contrôle par le serveur. Le modèle distillé de la phase 3A le remplacera sans
-  changer l'app (même format de fichiers). Le seuil de confiance est à calibrer sur la planche de 50 photos.
+- OCR mesuré sur images synthétiques seulement : la planche de 50 photos reste à prendre. Les deux lecteurs
+  tournent l'un après l'autre (~1,5 s sur PC en WASM) : temps sur téléphone à mesurer.
 - Pas encore : YOLO (l'élève cadre la formule), télémétrie vers la gateway (mesures locales seulement),
   appairage avec l'ordinateur, endpoint `/v1/models` côté gateway.

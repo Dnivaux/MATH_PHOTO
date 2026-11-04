@@ -3,84 +3,204 @@
   "file": "00-rendu.png",
   "kind": "rendu",
   "latex": "3x-7=11",
-  "python": "3X-7=11",
-  "confidence": 0.994
+  "python": [
+   "3 x - 7 = 1 1",
+   "\\mathbf { 3 } x - \\mathbf { 7 } = \\mathbf { 1 1 }"
+  ],
+  "confidence": [
+   1.0,
+   0.97
+  ],
+  "readers": [
+   "p2t-mfr",
+   "p2t-mfr-1.5"
+  ]
  },
  {
   "file": "00-photo.png",
   "kind": "photo",
   "latex": "3x-7=11",
-  "python": "3X{\\overset{\\underset{\\mathrm{e}}{}}{\\longleftrightarrow}}\\mathbb{Z}=11",
-  "confidence": 0.834
+  "python": [
+   "3 x - 7 = 1 1",
+   "3 x - 7 = 1 1"
+  ],
+  "confidence": [
+   0.98,
+   0.991
+  ],
+  "readers": [
+   "p2t-mfr",
+   "p2t-mfr-1.5"
+  ]
  },
  {
   "file": "01-rendu.png",
   "kind": "rendu",
   "latex": "2x^{2}-3x-5=0",
-  "python": "2x^{2}-3x-5=0",
-  "confidence": 1.0
+  "python": [
+   "2 x ^ { 2 } - 3 x - 5 = 0",
+   "2 x ^ { 2 } - 3 x - 5 = 0"
+  ],
+  "confidence": [
+   1.0,
+   1.0
+  ],
+  "readers": [
+   "p2t-mfr",
+   "p2t-mfr-1.5"
+  ]
  },
  {
   "file": "01-photo.png",
   "kind": "photo",
   "latex": "2x^{2}-3x-5=0",
-  "python": "2X^{2}{\\mathrm{'}}23X\\mathrm{-}5=0",
-  "confidence": 0.854
+  "python": [
+   "2 x ^ { 2 } - 3 x - 5 = 0",
+   "2 x ^ { 2 } - 3 x - 5 = 0"
+  ],
+  "confidence": [
+   1.0,
+   1.0
+  ],
+  "readers": [
+   "p2t-mfr",
+   "p2t-mfr-1.5"
+  ]
  },
  {
   "file": "02-rendu.png",
   "kind": "rendu",
   "latex": "\\frac{2}{3}+\\frac{5}{6}",
-  "python": "{\\frac{2}{3}}+{\\frac{5}{6}}",
-  "confidence": 1.0
+  "python": [
+   "\\frac 2 3 + \\frac 5 6",
+   "\\frac { 2 } { 3 } + \\frac { 5 } { 6 }"
+  ],
+  "confidence": [
+   0.979,
+   1.0
+  ],
+  "readers": [
+   "p2t-mfr",
+   "p2t-mfr-1.5"
+  ]
  },
  {
   "file": "02-photo.png",
   "kind": "photo",
   "latex": "\\frac{2}{3}+\\frac{5}{6}",
-  "python": "{\\frac{2}{3}}\\underline{{F}}",
-  "confidence": 0.922
+  "python": [
+   "\\frac { 2 } { 3 } + \\frac { 5 } { 6 }",
+   "\\frac { 2 } { 3 } + \\frac { 5 } { 6 }"
+  ],
+  "confidence": [
+   0.979,
+   0.996
+  ],
+  "readers": [
+   "p2t-mfr",
+   "p2t-mfr-1.5"
+  ]
  },
  {
   "file": "03-rendu.png",
   "kind": "rendu",
   "latex": "\\int x e^{x}\\,dx",
-  "python": "\\textstyle\\int\\!\\chi\\epsilon^{x}\\,d\\chi",
-  "confidence": 0.892
+  "python": [
+   "\\int \\! x e ^ { x } \\, d x",
+   "\\int \\! x e ^ { x } d x"
+  ],
+  "confidence": [
+   1.0,
+   1.0
+  ],
+  "readers": [
+   "p2t-mfr",
+   "p2t-mfr-1.5"
+  ]
  },
  {
   "file": "04-rendu.png",
   "kind": "rendu",
   "latex": "\\lim_{x\\to 0}\\frac{\\sin x}{x}",
-  "python": "\\operatorname*{lim}_{x\\to0}{\\frac{\\sin x}{x}}",
-  "confidence": 0.997
+  "python": [
+   "\\operatorname* { l i m } _ { x \\to 0 } \\frac { \\operatorname { s i n } x } { x }",
+   "\\underset { x \\to 0 } { \\operatorname* { l i m } } \\frac { \\operatorname { s i n } x } { x }"
+  ],
+  "confidence": [
+   0.998,
+   0.99
+  ],
+  "readers": [
+   "p2t-mfr",
+   "p2t-mfr-1.5"
+  ]
  },
  {
   "file": "04-photo.png",
   "kind": "photo",
   "latex": "\\lim_{x\\to 0}\\frac{\\sin x}{x}",
-  "python": "\\operatorname*{lim}_{X\\to0}{\\frac{\\sin X}{X}}",
-  "confidence": 0.955
+  "python": [
+   "\\operatorname* { l i m } _ { x \\to 0 } \\frac { \\sin X } { x }",
+   "\\operatorname* { l i m } _ { x \\to 0 } \\frac { \\operatorname { s i n } { x } } { x }"
+  ],
+  "confidence": [
+   0.943,
+   0.97
+  ],
+  "readers": [
+   "p2t-mfr",
+   "p2t-mfr-1.5"
+  ]
  },
  {
   "file": "05-rendu.png",
   "kind": "rendu",
   "latex": "\\sqrt{18}+\\left(\\frac{2}{3}\\right)^{2}",
-  "python": "{\\sqrt{18}}+({\\frac{2}{3}})^{2}",
-  "confidence": 0.992
+  "python": [
+   "\\sqrt { 1 8 } + ( \\frac { 2 } { 3 } ) ^ { 2 }",
+   "\\sqrt { \\textbf { 1 8 } } + ( \\frac { 2 } { 3 } ) ^ { 2 }"
+  ],
+  "confidence": [
+   0.97,
+   0.948
+  ],
+  "readers": [
+   "p2t-mfr",
+   "p2t-mfr-1.5"
+  ]
  },
  {
   "file": "06-rendu.png",
   "kind": "rendu",
   "latex": "f(x)=\\frac{\\sin(x)}{x}",
-  "python": "f(X)={\\frac{\\sin(x)}{x}}",
-  "confidence": 0.957
+  "python": [
+   "f ( x ) = \\frac { \\operatorname { s i n } ( x ) } { x }",
+   "f ( x ) = { \\frac { \\operatorname { s i n } ( x ) } { x } }"
+  ],
+  "confidence": [
+   0.998,
+   0.961
+  ],
+  "readers": [
+   "p2t-mfr",
+   "p2t-mfr-1.5"
+  ]
  },
  {
   "file": "07-rendu.png",
   "kind": "rendu",
   "latex": "x^{2}-5x+6=0",
-  "python": "\\chi^{2}-5\\chi+6=0",
-  "confidence": 0.93
+  "python": [
+   "x ^ { 2 } - 5 x + 6 = 0",
+   "x ^ { 2 } - 5 x + 6 = 0"
+  ],
+  "confidence": [
+   1.0,
+   1.0
+  ],
+  "readers": [
+   "p2t-mfr",
+   "p2t-mfr-1.5"
+  ]
  }
 ]

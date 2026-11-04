@@ -1,45 +1,60 @@
 /**
- * OCR embarqué : pix2tex (LaTeX-OCR, licence MIT) exporté en ONNX INT8, exécuté par onnxruntime-web (WASM)
- * dans la WebView du moteur. Trois graphes : redimensionnement, encodeur, décodeur (sans cache, un pas
- * par jeton). Le prétraitement et le décodage reproduisent ceux de pix2tex, validés contre PyTorch par
- * models/pix2tex/export_onnx.py (même texte en sortie).
+ * OCR embarqué : deux lecteurs pix2text-mfr (v1 et 1.5, licence MIT, encodeur DeiT + décodeur TrOCR) en ONNX
+ * INT8, exécutés par onnxruntime-web (WASM) dans la WebView du moteur. Chaque lecteur : encodeur, puis décodeur
+ * sans cache, un pas par jeton, décodage glouton. Les deux lisent la même image ; l'app compare leurs lectures
+ * (vote) : quand elles concordent, la formule est juste dans 99,6 % des cas du banc OCR.
  *
- * Le modèle distillé du projet (phase 3A) remplacera ces fichiers sans changer ce code : même format
- * (encoder / decoder / resizer + vocab.json + config.json).
+ * Le prétraitement et le décodage reproduisent serving/ocr/trocr_onnx.py (référence Python, validée contre
+ * transformers par scripts/p2t_mfr/export.py) : niveaux de gris recopiés sur 3 canaux, redimensionnement
+ * bicubique type Pillow en 384 x 384, normalisation (x - 0,5) / 0,5, détokenisation ByteLevel.
  *
- * Sortie : { raw, confidence (moyenne géométrique des probabilités des jetons), temps }.
+ * Sortie : { raw, confidence (moyenne géométrique des probabilités des jetons), readings (une par lecteur), temps }.
  */
 export const OCR_SOURCE = String.raw`
 var OCR = (function () {
-  var cfg = null, vocab = null, sess = null, loading = null, loadMs = 0;
+  var readers = null, loading = null, loadMs = 0;
 
   function base() { return window.__OCR_BASE; }
 
   function getJson(path) { return fetch(base() + path).then(function (r) { if (!r.ok) throw new Error('absent : ' + path); return r.json(); }); }
   function getBuf(path) { return fetch(base() + path).then(function (r) { if (!r.ok) throw new Error('absent : ' + path); return r.arrayBuffer(); }); }
 
+  function loadReader(name, opts) {
+    var dir = name + '/', cfg;
+    return getJson(dir + 'config.json').then(function (c) {
+      cfg = c;
+      // l'un après l'autre : deux graphes de ~30 Mo décompressés en même temps saturent la mémoire de la WebView
+      return getJson(dir + 'vocab.json');
+    }).then(function (vocab) {
+      cfg.vocab = vocab;
+      return getBuf(dir + cfg.encoder).then(function (b) { return ort.InferenceSession.create(b, opts); });
+    }).then(function (enc) {
+      cfg.enc = enc;
+      return getBuf(dir + cfg.decoder).then(function (b) { return ort.InferenceSession.create(b, opts); });
+    }).then(function (dec) {
+      cfg.dec = dec;
+      return cfg;
+    });
+  }
+
   function init() {
     if (loading) return loading;
     var t0 = Date.now();
     window.__enginePost({ type: 'status', ocr: 'loading' });
-    loading = getJson('config.json').then(function (c) {
-      cfg = c;
-      ort.env.wasm.numThreads = 1;      // pas de SharedArrayBuffer dans une WebView Android
-      ort.env.wasm.simd = true;
-      ort.env.wasm.proxy = false;
-      ort.env.wasm.wasmPaths = window.__ORT_BASE;
-      var opts = { executionProviders: ['wasm'], graphOptimizationLevel: 'all' };
-      return Promise.all([
-        getJson('vocab.json'),
-        getBuf(c.resizer).then(function (b) { return ort.InferenceSession.create(b, opts); }),
-        getBuf(c.encoder).then(function (b) { return ort.InferenceSession.create(b, opts); }),
-        getBuf(c.decoder).then(function (b) { return ort.InferenceSession.create(b, opts); }),
-      ]);
+    ort.env.wasm.numThreads = 1;      // pas de SharedArrayBuffer dans une WebView Android
+    ort.env.wasm.simd = true;
+    ort.env.wasm.proxy = false;
+    ort.env.wasm.wasmPaths = window.__ORT_BASE;
+    var opts = { executionProviders: ['wasm'], graphOptimizationLevel: 'all' };
+    loading = getJson('readers.json').then(function (list) {
+      var out = [];
+      return list.readers.reduce(function (p, name) {
+        return p.then(function () { return loadReader(name, opts); }).then(function (r) { out.push(r); });
+      }, Promise.resolve()).then(function () { return out; });
     }).then(function (r) {
-      vocab = r[0];
-      sess = { resizer: r[1], encoder: r[2], decoder: r[3] };
+      readers = r;
       loadMs = Date.now() - t0;
-      window.__enginePost({ type: 'status', ocr: 'ready', ocrLoadMs: loadMs, ocrModel: cfg.name + ' ' + cfg.version });
+      window.__enginePost({ type: 'status', ocr: 'ready', ocrLoadMs: loadMs, ocrModel: modelName() });
       return true;
     }).catch(function (e) {
       loading = null;
@@ -48,6 +63,8 @@ var OCR = (function () {
     });
     return loading;
   }
+
+  function modelName() { return readers.map(function (r) { return r.name; }).join(' + '); }
 
   // ------------------------------------------------------------ images en niveaux de gris
 
@@ -88,6 +105,13 @@ var OCR = (function () {
    * d'autres tailles que pix2tex. Deux passes séparables (horizontale puis verticale), arrondi à l'octet.
    */
   var FILTERS = {
+    bicubic: { support: 2, f: function (x) {   // a = -0,5, comme Pillow
+      var a = -0.5;
+      x = Math.abs(x);
+      if (x < 1) return ((a + 2) * x - (a + 3)) * x * x + 1;
+      if (x < 2) return (((x - 5) * x + 8) * x - 4) * a;
+      return 0;
+    } },
     bilinear: { support: 1, f: function (x) { x = Math.abs(x); return x < 1 ? 1 - x : 0; } },
     lanczos: { support: 3, f: function (x) {
       x = Math.abs(x);
@@ -184,105 +208,75 @@ var OCR = (function () {
     });
   }
 
-  /** pix2tex.utils.pad : normalisation min/max, inversion si fond sombre, rognage au texte, pad au multiple de 32 */
-  function binarizeCropPad(g) {
-    var n = g.w * g.h, mn = 255, mx = 0, i;
-    for (i = 0; i < n; i++) { if (g.d[i] < mn) mn = g.d[i]; if (g.d[i] > mx) mx = g.d[i]; }
-    var span = Math.max(1e-6, mx - mn), data = new Float32Array(n), sum = 0;
-    for (i = 0; i < n; i++) { data[i] = (g.d[i] - mn) / span * 255; sum += data[i]; }
-    if (sum / n <= 128) for (i = 0; i < n; i++) data[i] = 255 - data[i];
-    var minX = g.w, minY = g.h, maxX = -1, maxY = -1;
-    for (var y = 0; y < g.h; y++) for (var x = 0; x < g.w; x++) {
-      if (data[y * g.w + x] < 128) { if (x < minX) minX = x; if (x > maxX) maxX = x; if (y < minY) minY = y; if (y > maxY) maxY = y; }
-    }
-    if (maxX < 0) { minX = 0; minY = 0; maxX = g.w - 1; maxY = g.h - 1; }
-    var w = maxX - minX + 1, h = maxY - minY + 1;
-    var W = Math.ceil(w / 32) * 32, H = Math.ceil(h / 32) * 32, out = new Float32Array(W * H).fill(255);
-    for (var yy = 0; yy < h; yy++) for (var xx = 0; xx < w; xx++) out[yy * W + xx] = Math.floor(data[(yy + minY) * g.w + xx + minX]);
-    return { w: W, h: H, d: out };
+  /** Image 384 x 384, recopiée sur 3 canaux et normalisée (DeiTImageProcessor : resample = 3, bicubique) */
+  function tensor(g, cfg) {
+    var img = pilResize(g, cfg.size, cfg.size, 'bicubic'), n = cfg.size * cfg.size, a = new Float32Array(3 * n);
+    for (var i = 0; i < n; i++) { var v = (img.d[i] / 255 - cfg.mean) / cfg.std; a[i] = a[n + i] = a[2 * n + i] = v; }
+    return new ort.Tensor('float32', a, [1, 3, cfg.size, cfg.size]);
   }
 
-  /** pix2tex.cli.minmax_size : réduit sous 672x192, complète au-dessus de 32x32 */
-  function minmax(g) {
-    var r = Math.max(g.w / cfg.max_width, g.h / cfg.max_height);
-    if (r > 1) g = pilResize(g, Math.floor(g.w / r), Math.floor(g.h / r), 'bilinear');
-    if (g.w < cfg.min_width || g.h < cfg.min_height) {
-      var W = Math.max(g.w, cfg.min_width), H = Math.max(g.h, cfg.min_height), out = new Float32Array(W * H).fill(255);
-      for (var y = 0; y < g.h; y++) for (var x = 0; x < g.w; x++) out[y * W + x] = g.d[y * g.w + x];
-      g = { w: W, h: H, d: out };
-    }
-    return g;
+  function argmax(arr, from, to) { var b = from; for (var i = from + 1; i < to; i++) if (arr[i] > arr[b]) b = i; return b - from; }
+
+  /** Table inverse de bytes_to_unicode (GPT-2) : chaque octet est écrit comme un caractère imprimable */
+  var BYTES = null;
+  function byteDecoder() {
+    if (BYTES) return BYTES;
+    var bs = [], cs, n = 0, b;
+    for (b = 33; b <= 126; b++) bs.push(b);
+    for (b = 161; b <= 172; b++) bs.push(b);
+    for (b = 174; b <= 255; b++) bs.push(b);
+    cs = bs.slice();
+    for (b = 0; b < 256; b++) if (bs.indexOf(b) < 0) { bs.push(b); cs.push(256 + n); n++; }
+    BYTES = {};
+    for (var i = 0; i < bs.length; i++) BYTES[String.fromCharCode(cs[i])] = bs[i];
+    return BYTES;
   }
 
-  function tensor(g) {
-    var a = new Float32Array(g.w * g.h);
-    for (var i = 0; i < a.length; i++) a[i] = (g.d[i] / 255 - cfg.mean) / cfg.std;
-    return new ort.Tensor('float32', a, [1, 1, g.h, g.w]);
+  /** Jetons ByteLevel -> texte (tokenizer.decode(skip_special_tokens=True)) */
+  function detokenize(tokens) {
+    var table = byteDecoder(), bytes = [];
+    tokens.forEach(function (t) {
+      if (!t || (t[0] === '<' && t[t.length - 1] === '>')) return;
+      for (var i = 0; i < t.length; i++) { var v = table[t[i]]; if (v !== undefined) bytes.push(v); }
+    });
+    return new TextDecoder('utf-8').decode(new Uint8Array(bytes)).trim();
   }
 
-  function argmax(arr) { var b = 0; for (var i = 1; i < arr.length; i++) if (arr[i] > arr[b]) b = i; return b; }
-
-  /** Taille d'entrée conseillée par le modèle de redimensionnement (10 itérations au plus, comme pix2tex) */
-  function prepare(gray) {
-    var base = minmax(binarizeCropPad(gray));
-    var r = 1, w = base.w, h = base.h, img = base;
-    function step(i) {
-      if (i >= 10) return Promise.resolve(img);
-      h = Math.floor(h * r);
-      img = binarizeCropPad(minmax(pilResize(base, w, h, r > 1 ? 'bilinear' : 'lanczos')));
-      return sess.resizer.run({ image: tensor(img) }).then(function (o) {
-        w = (argmax(o.logits.data) + 1) * 32;
-        if (w === img.w) return img;
-        r = w / img.w;
-        return step(i + 1);
-      });
-    }
-    return step(0);
-  }
-
-  /** pix2tex.utils.post_process : retire les espaces inutiles du LaTeX */
-  function postProcess(s) {
-    var textReg = /(\\(operatorname|mathrm|text|mathbf)\s?\*? {.*?})/g;
-    var names = (s.match(textReg) || []).map(function (x) { return x.replace(/ /g, ''); });
-    s = s.replace(textReg, function () { return names.shift(); });
-    var noletter = '[\\W_^\\d]', letter = '[a-zA-Z]';
-    var r1 = new RegExp('(?!\\\\ )(' + noletter + ')\\s+?(' + noletter + ')', 'g');
-    var r2 = new RegExp('(?!\\\\ )(' + noletter + ')\\s+?(' + letter + ')', 'g');
-    var r3 = new RegExp('(' + letter + ')\\s+?(' + noletter + ')', 'g');
-    var news = s;
-    for (var guard = 0; guard < 100; guard++) {
-      s = news;
-      news = s.replace(r1, '$1$2').replace(r2, '$1$2').replace(r3, '$1$2');
-      if (news === s) break;
-    }
-    return s;
-  }
-
-  function decodeTokens(ids) {
-    var s = ids.map(function (i) { return vocab[i] || ''; }).join('').replace(/Ġ/g, ' ');
-    s = s.replace(/\[EOS\]|\[BOS\]|\[PAD\]/g, '').trim();
-    return postProcess(s);
-  }
-
-  function greedy(x) {
-    return sess.encoder.run({ image: x }).then(function (enc) {
-      var memory = enc.memory, toks = [cfg.bos], logp = 0, count = 0;
+  function greedy(r, x) {
+    var t0 = Date.now();
+    return r.enc.run({ pixel_values: x }).then(function (enc) {
+      var memory = enc.last_hidden_state, toks = [r.start], logp = 0, steps = 0, V = r.vocab.length;
       function next() {
-        if (toks.length > cfg.max_tokens) return Promise.resolve();
+        if (steps >= r.max_tokens) return Promise.resolve();
         var t = new ort.Tensor('int64', BigInt64Array.from(toks.map(function (v) { return BigInt(v); })), [1, toks.length]);
-        return sess.decoder.run({ tokens: t, memory: memory }).then(function (o) {
-          var l = o.logits.data, best = argmax(l), m = l[best], z = 0;
-          for (var i = 0; i < l.length; i++) z += Math.exp(l[i] - m);
-          logp += -Math.log(z); count++;
-          if (best === cfg.eos) return;
+        return r.dec.run({ input_ids: t, encoder_hidden_states: memory }).then(function (o) {
+          var l = o.logits.data, from = (toks.length - 1) * V, to = from + V, best = argmax(l, from, to), m = l[from + best], z = 0;
+          for (var i = from; i < to; i++) z += Math.exp(l[i] - m);
+          logp += -Math.log(z); steps++;
+          if (best === r.eos) return;
           toks.push(best);
           return next();
         });
       }
       return next().then(function () {
-        return { ids: toks.slice(1), confidence: count ? Math.exp(logp / count) : 0 };
+        var ids = toks.slice(1);
+        return {
+          model: r.name,
+          raw: detokenize(ids.map(function (i) { return r.vocab[i]; })),
+          confidence: Math.round((steps ? Math.exp(logp / steps) : 0) * 1000) / 1000,
+          tokens: ids.length,
+          ms: Date.now() - t0,
+        };
       });
     });
+  }
+
+  /** Les lecteurs l'un après l'autre (WASM sur un seul fil) */
+  function readAll(g) {
+    var out = [];
+    return readers.reduce(function (p, r) {
+      return p.then(function () { return greedy(r, tensor(g, r)); }).then(function (res) { out.push(res); });
+    }, Promise.resolve()).then(function () { return out; });
   }
 
   function b64ToBlob(b64, mime) {
@@ -292,29 +286,30 @@ var OCR = (function () {
   }
 
   function recognize(p) {
-    var t0 = Date.now(), t1, t2, jpeg = null;
+    var t0 = Date.now(), t1, t2, jpeg = null, size = null;
     return init().then(function () {
       t1 = Date.now();
       return loadGray(b64ToBlob(p.imageBase64, p.mime), p.crop);
     }).then(function (gray) {
       jpeg = gray.jpeg || null;
-      return prepare(gray);
-    }).then(function (img) {
+      size = [gray.w, gray.h];
       t2 = Date.now();
-      return greedy(tensor(img)).then(function (r) {
-        return {
-          raw: decodeTokens(r.ids),
-          confidence: Math.round(r.confidence * 1000) / 1000,
-          tokens: r.ids.length,
-          input: [img.w, img.h],
-          waitMs: t1 - t0, preprocessMs: t2 - t1, inferenceMs: Date.now() - t2,
-          model: cfg.name + ' ' + cfg.version,
-          image: jpeg,
-        };
-      });
+      return readAll(gray);
+    }).then(function (readings) {
+      var first = readings[0];
+      return {
+        raw: first.raw,
+        confidence: first.confidence,
+        tokens: first.tokens,
+        input: size,
+        waitMs: t1 - t0, preprocessMs: t2 - t1, inferenceMs: Date.now() - t2,
+        model: modelName(),
+        image: jpeg,
+        readings: readings,
+      };
     });
   }
 
-  return { init: init, recognize: recognize, _decode: decodeTokens, _postProcess: postProcess };
+  return { init: init, recognize: recognize, _detokenize: detokenize };
 })();
 `;

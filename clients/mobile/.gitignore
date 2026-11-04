@@ -15,6 +15,8 @@ ios/build/
 android/app/src/main/assets/engine/
 # bibliothèques NPU copiées par la compilation de llama.rn (tâche syncRNLlamaHtpAssets)
 android/app/src/main/assets/ggml-hexagon/
+# lecteurs OCR exportés (régénérés par scripts/p2t_mfr/export.py)
+scripts/p2t_mfr/onnx/
 # export ONNX de pix2tex (régénéré par scripts/pix2tex/export_onnx.py)
 scripts/pix2tex/.venv/
 scripts/pix2tex/weights/

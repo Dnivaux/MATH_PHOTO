@@ -71,8 +71,12 @@ export const CameraScannerScreen: React.FC<Props> = ({ navigation }) => {
     latex: string;
     confidence: number | null;
     image: string | null;
-    /** device : lue par pix2tex sur le téléphone ; server : relue par TexTeller sur le serveur */
+    /** device : lue sur le téléphone (pix2text-mfr) ; server : relue par TexTeller sur le serveur */
     source: 'device' | 'server';
+    /** lecture du téléphone non confirmée (lecteurs en désaccord, serveur injoignable) */
+    uncertain: boolean;
+    /** l'autre lecture du téléphone, proposée quand les deux lecteurs ne concordent pas */
+    alt: string | null;
   } | null>(null);
   // étape de lecture en cours, et message quand aucune lecture n'est montrable
   const [stage, setStage] = useState<'device' | 'server' | null>(null);
@@ -115,9 +119,10 @@ export const CameraScannerScreen: React.FC<Props> = ({ navigation }) => {
   });
 
   /**
-   * Lecture d'une photo. Le téléphone lit d'abord (pix2tex, hors ligne). Si sa lecture est douteuse (confiance
-   * basse, charabia, formule que le moteur ne sait pas lire), le serveur relit la zone recadrée (TexTeller).
-   * Une lecture manifestement inexploitable n'est jamais montrée à l'utilisateur.
+   * Lecture d'une photo. Le téléphone lit d'abord, avec deux lecteurs (pix2text-mfr v1 et 1.5, hors ligne). S'ils
+   * concordent et que le moteur comprend la formule, elle est montrée. Sinon le serveur relit la zone recadrée
+   * (TexTeller) ; hors connexion, l'app montre la lecture du téléphone avec l'autre lecture au choix. Une lecture
+   * manifestement inexploitable n'est jamais montrée à l'utilisateur.
    */
   const recognize = useCallback(async (base64: string, mime: string, crop?: FractionRect) => {
     setUnreadable(null);
@@ -125,14 +130,15 @@ export const CameraScannerScreen: React.FC<Props> = ({ navigation }) => {
     try {
       const res = await recognizeOnDevice(base64, mime, crop);
       const s = getSettings();
-      const garbled = !res.latex || looksGarbled(res.latex);
-      let doubtful = garbled || res.confidence < s.ocrMinConfidence;
+      const readable = (l: string | null): l is string => !!l && !looksGarbled(l);
+      let doubtful = !res.agree || !readable(res.latex);
       if (!doubtful) {
         const a = await MathEngine.analyze(res.latex).catch(() => null);
         doubtful = !a?.valid;
       }
+      const onDevice = { confidence: res.confidence, image: res.image, source: 'device' as const };
       if (!doubtful) {
-        setScanned({ latex: res.latex, confidence: res.confidence, image: res.image, source: 'device' });
+        setScanned({ ...onDevice, latex: res.latex, uncertain: false, alt: null });
         return;
       }
       if (res.image && s.allowServer) {
@@ -140,18 +146,20 @@ export const CameraScannerScreen: React.FC<Props> = ({ navigation }) => {
         try {
           const r = await ocrOnServer(res.image);
           const latex = normalizeOcrLatex(r.latex);
-          if (latex && !looksGarbled(latex)) {
-            setScanned({ latex, confidence: null, image: res.image, source: 'server' });
+          if (readable(latex)) {
+            setScanned({ latex, confidence: null, image: res.image, source: 'server', uncertain: false, alt: null });
           } else {
             setUnreadable('Même le serveur n’arrive pas à lire cette photo. Cadre une seule ligne, bien éclairée, sans reflet.');
           }
           return;
         } catch {
-          // serveur injoignable : on se rabat sur la lecture du téléphone si elle est présentable
+          // serveur injoignable : on se rabat sur les lectures du téléphone si elles sont présentables
         }
       }
-      if (!garbled) {
-        setScanned({ latex: res.latex, confidence: res.confidence, image: res.image, source: 'device' });
+      // la lecture du lecteur v1 d'abord (la meilleure au banc), l'autre au choix
+      const options = [res.latex, res.alt].filter(readable);
+      if (options.length) {
+        setScanned({ ...onDevice, latex: options[0], uncertain: true, alt: options[1] ?? null });
       } else {
         setUnreadable(
           s.allowServer
@@ -326,8 +334,9 @@ export const CameraScannerScreen: React.FC<Props> = ({ navigation }) => {
       <ScannedFormulaCard
         latex={scanned?.latex ?? ''}
         isRecognizing={isProcessing}
-        confidence={scanned?.confidence ?? null}
-        threshold={settings.ocrMinConfidence}
+        uncertain={scanned?.uncertain ?? false}
+        alt={scanned?.alt ?? null}
+        onSwap={() => setScanned(v => (v && v.alt ? { ...v, latex: v.alt, alt: v.latex } : v))}
         bottom={cardBottom}
         onEdit={latex => openCalculator(latex)}
         onSolve={latex => {
