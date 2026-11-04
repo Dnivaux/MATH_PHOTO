@@ -166,6 +166,21 @@ La photo ne quitte le téléphone que dans ces cas d'escalade, et n'est gardée 
 
 ---
 
+## Outils MLOps (4 novembre, suite)
+
+- **Test de charge** : `make load-test` (Locust par paliers, runs `load-*`). Capacité 64 utilisateurs simultanés
+  (16,6 req/s, /v1/solve p95 1,7 s) après deux corrections : bac à sable 2 → 8 cœurs, appel OCR serveur
+  asynchrone. Prochain goulot : OCR serveur (TexTeller CPU, ~1 photo/s), puis le GPU.
+- **Dérive** : `make drift` (Evidently, runs `drift-entrees` / `drift-production`). Validé : trafic normal sans
+  dérive, trafic de limites seulement en dérive sur 6 colonnes sur 6. Nouveau : `GET /admin/usage/rows`,
+  caractéristiques de formule dans l'usage, `GATEWAY_ADMIN_TOKEN` dans `.env`.
+- **VM + déploiement** : `infra/terraform` (OpenTofu, libvirt) et `.github/workflows/deploy.yml` (runner
+  auto-hébergé, vérification, retour arrière). Écrits, pas encore lancés : attend `sudo pacman -S qemu-base libvirt
+  dnsmasq opentofu cdrtools`.
+- **OCR, captures** : `GATEWAY_OCR_CAPTURE_DIR` (développement) garde les photos relues par le serveur. Les 4
+  premières : photos d'écran (moiré) et morceaux de lignes voisines dans le cadre. Pistes : lisser avant lecture,
+  effacer ce qui touche le bord, relecture serveur en parallèle du second lecteur.
+
 ## Suite
 
 Relancer : `make up` (tout), ou `make infra-up` seul pour entraîner. Gateway sur :8100, jeton `dev-token`.

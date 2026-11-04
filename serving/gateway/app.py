@@ -8,6 +8,7 @@ Option mode léger : EXPLAIN_BASE_URL / EXPLAIN_MODEL (ex. llama-server sur le G
 
 from __future__ import annotations
 
+import json
 import os
 import time
 import uuid
@@ -21,6 +22,7 @@ from common.prompts import explain_messages
 from eval.faithfulness import check_explanation
 from serving.gateway import admin, metrics, models, pipeline, usage
 from serving.gateway.auth import require_token
+from serving.gateway.features import latex_features
 from serving.gateway.schema import (
     ExplainRequest, ExplainResponse, Explanation, Health, ModelInfo, OcrRequest, OcrResponse, SolveRequest, SolveResponse,
 )
@@ -34,12 +36,24 @@ MODEL_VERSION = os.getenv("VLLM_MODEL_VERSION") or (_VERSION_FILE.read_text().st
 EXPLAIN_BASE_URL = os.getenv("EXPLAIN_BASE_URL")
 EXPLAIN_MODEL = os.getenv("EXPLAIN_MODEL", "explainer")
 OCR_URL = os.getenv("OCR_URL")  # service OCR serveur (serving/ocr/service.py, TexTeller)
+# Développement seulement (vide par défaut) : garde les photos relues et la lecture du serveur, pour comprendre
+# une mauvaise lecture et constituer le jeu de vraies photos. Jamais activé en production (données des élèves).
+OCR_CAPTURE_DIR = os.getenv("OCR_CAPTURE_DIR")
 
 app = FastAPI(title="Photo → Maths gateway", version="1.0")
 app.include_router(models.router)
 app.include_router(admin.router)
 app.include_router(metrics.router)
 _code_client = OpenAI(base_url=VLLM_BASE_URL, api_key="EMPTY", timeout=60)
+
+
+async def _read_image_async(image_base64: str) -> str:
+    import httpx
+
+    async with httpx.AsyncClient(timeout=30) as client:
+        r = await client.post(f"{OCR_URL.rstrip('/')}/ocr", json={"image_base64": image_base64})
+    r.raise_for_status()
+    return r.json()["latex"]
 
 
 def _read_image(image_base64: str) -> str:
@@ -78,7 +92,11 @@ async def solve(req: SolveRequest, bg: BackgroundTasks, who: Principal = Depends
                 total_ms=resp.timings.total_ms, llm_ms=resp.timings.llm_ms, model=VLLM_MODEL, model_version=MODEL_VERSION,
                 extra={"attempts": resp.code.attempts if resp.code else None, "request_id": resp.request_id,
                        "input": "+".join(k for k, v in (("latex", req.latex), ("image", req.image_base64)) if v),
-                       "latex_source": resp.problem.latex_source if resp.problem else None, "ocr_ms": resp.timings.ocr_ms})
+                       "latex_source": resp.problem.latex_source if resp.problem else None, "ocr_ms": resp.timings.ocr_ms,
+                       # suivi de dérive (eval/drift.py) : caractéristiques de la formule, pas la formule
+                       **latex_features(resp.problem.latex if resp.problem else req.latex),
+                       "app_version": req.client.app_version,
+                       "ocr_confidence": req.escalation.ocr_confidence if req.escalation else None})
     return resp
 
 
@@ -89,7 +107,9 @@ async def ocr(req: OcrRequest, bg: BackgroundTasks, who: Principal = Depends(req
         raise HTTPException(503, "OCR serveur non configuré : OCR_URL")
     t0 = time.perf_counter()
     try:
-        latex = await run_in_threadpool(_read_image, req.image_base64)
+        # asynchrone : une relecture en attente (TexTeller sur CPU, une photo à la fois) n'occupe pas un des fils de
+        # la gateway ; sinon, sous charge, elle bloque les résolutions (test de charge à 128 utilisateurs)
+        latex = await _read_image_async(req.image_base64)
     except Exception as e:  # noqa: BLE001
         raise HTTPException(502, f"OCR serveur indisponible : {type(e).__name__}") from e
     ms = (time.perf_counter() - t0) * 1e3
@@ -97,7 +117,19 @@ async def ocr(req: OcrRequest, bg: BackgroundTasks, who: Principal = Depends(req
     metrics.observe_ocr(req.client.platform, ms)
     bg.add_task(usage.record, who, "ocr", platform=req.client.platform, mode=req.client.mode, status="ok",
                 total_ms=ms, model="texteller", extra={"request_id": rid})
+    if OCR_CAPTURE_DIR:
+        bg.add_task(_capture, rid, req.image_base64, latex)
     return OcrResponse(request_id=rid, latex=latex, ms=ms)
+
+
+def _capture(rid: str, image_base64: str, latex: str) -> None:
+    import base64
+
+    d = Path(OCR_CAPTURE_DIR)
+    d.mkdir(parents=True, exist_ok=True)
+    (d / f"{time.strftime('%Y%m%d-%H%M%S')}-{rid[:8]}.jpg").write_bytes(base64.b64decode(image_base64))
+    with (d / "captures.jsonl").open("a") as f:
+        f.write(json.dumps({"request_id": rid, "latex_server": latex, "at": time.time()}) + "\n")
 
 
 @app.post("/v1/explain", response_model=ExplainResponse)

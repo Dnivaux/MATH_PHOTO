@@ -230,9 +230,11 @@ services:
       - /tmp:size=64m,mode=1777
     cap_drop: [ALL]
     security_opt: ["no-new-privileges:true"]
-    pids_limit: 128
-    mem_limit: 3g
-    cpus: 2
+    # test de charge (eval/load_test.py) : à 2 cœurs, le bac à sable plafonnait la stack à ~6 req/s (un Python +
+    # SymPy par exécution) ; à 8, le GPU redevient la limite. Surchargeable : SANDBOX_CPUS dans .env
+    pids_limit: 256
+    mem_limit: 6g
+    cpus: ${SANDBOX_CPUS:-8}
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8200/health')"]
       interval: 10s
@@ -274,6 +276,7 @@ services:
     environment:
       <<: *gateway-env
       OCR_URL: http://ocr:8300
+      OCR_CAPTURE_DIR: ${GATEWAY_OCR_CAPTURE_DIR:-}   # développement (.env) : /cache/ocr-captures pour garder les photos relues
 
   gateway-ci:
     # Profil ci : mêmes réglages, le faux LLM répond sous les noms `vllm` et `explainer`

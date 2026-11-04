@@ -181,6 +181,15 @@ def summary(hours: float = 24, user: str | None = None) -> list[dict]:
     return sorted(out.values(), key=lambda u: -u["requests"])
 
 
+def rows(hours: float = 24 * 7, endpoint: str | None = None, limit: int = 50_000) -> list[dict]:
+    """Lignes brutes de la fenêtre (les plus récentes d'abord), pour la détection de dérive."""
+    q = select(usage).where(usage.c.ts >= _now() - timedelta(hours=hours)).order_by(usage.c.ts.desc()).limit(limit)
+    if endpoint:
+        q = q.where(usage.c.endpoint == endpoint)
+    with engine().connect() as c:
+        return [{**r._mapping, "ts": r.ts.isoformat()} for r in c.execute(q)]
+
+
 def count() -> int:
     with engine().connect() as c:
         return c.execute(select(func.count()).select_from(usage)).scalar()

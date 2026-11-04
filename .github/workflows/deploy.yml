@@ -1,0 +1,57 @@
+# Déploiement automatique sur la VM de staging (grille MLOps 1) : après une CI verte sur master, le runner
+# auto-hébergé de la VM (infra/terraform, étiquette « staging ») met le dépôt au commit testé, reconstruit la
+# stack en profil ci, puis la vérifie (santé + une résolution). Si la vérification échoue, il revient au commit
+# précédent et le job échoue.
+#
+# Déclenché par la fin de la CI sur master seulement (jamais par une pull request : le runner est sur ta machine).
+name: deploy
+
+on:
+  workflow_run:
+    workflows: [ci]
+    types: [completed]
+    branches: [master]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-staging
+  cancel-in-progress: false
+
+jobs:
+  staging:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: [self-hosted, staging]
+    timeout-minutes: 30
+    env:
+      APP: /opt/photo-maths
+      SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+    steps:
+      - name: Commit testé
+        run: |
+          cd "$APP"
+          git rev-parse HEAD > .deployed-previous
+          git fetch --quiet origin
+          git checkout --quiet --force "$SHA"
+          echo "déploiement de $(git log -1 --format='%h %s')"
+      - name: Stack (profil ci)
+        run: |
+          cd "$APP"
+          docker compose --profile ci build
+          test -f data/eval/problems_v1.jsonl || docker compose --profile ci run --rm --no-deps \
+            -v "$APP/data:/app/data" gateway-ci python -m datagen.build_sets eval --per-type 50
+          docker compose --profile ci up -d --remove-orphans
+      - name: Vérification
+        run: |
+          for i in $(seq 60); do curl -sf localhost:8100/health >/dev/null && break; sleep 2; done
+          curl -sf localhost:8100/health
+          r=$(curl -sf -H "Authorization: Bearer dev-token" -H "Content-Type: application/json" \
+                -d '{"latex": "- 3 x^{2} + 23 x - 30 = 0", "escalation": {"reason": "out_of_local_scope"}}' localhost:8100/v1/solve)
+          echo "$r" | jq '{status, result: .result.latex}'
+          test "$(echo "$r" | jq -r .status)" = ok
+      - name: Retour au commit précédent
+        if: failure()
+        run: |
+          cd "$APP"
+          git checkout --quiet --force "$(cat .deployed-previous)"
+          docker compose --profile ci up -d --build --remove-orphans
+          echo "::error::vérification échouée : retour à $(git log -1 --format='%h %s')"

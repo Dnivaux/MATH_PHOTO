@@ -74,9 +74,38 @@ def test_ocr_endpoint(client, monkeypatch):
     monkeypatch.setattr(gateway, "OCR_URL", None)
     assert client.post("/v1/ocr", json={"image_base64": "aW1n"}, headers=auth).status_code == 503
     monkeypatch.setattr(gateway, "OCR_URL", "http://ocr:8300")
-    monkeypatch.setattr(gateway, "_read_image", lambda b64: "2x^{2}-3x-5=0")
+    async def read(b64):
+        return "2x^{2}-3x-5=0"
+
+    async def down(b64):
+        raise OSError()
+
+    monkeypatch.setattr(gateway, "_read_image_async", read)
     r = client.post("/v1/ocr", json={"image_base64": "aW1n", "client": {"platform": "android"}}, headers=auth)
     assert r.status_code == 200 and r.json()["latex"] == "2x^{2}-3x-5=0"
-    monkeypatch.setattr(gateway, "_read_image", lambda b64: (_ for _ in ()).throw(OSError()))
+    monkeypatch.setattr(gateway, "_read_image_async", down)
     assert client.post("/v1/ocr", json={"image_base64": "aW1n"}, headers=auth).status_code == 502
     assert 'gateway_requests_total{endpoint="ocr"' in client.get("/metrics").text
+
+
+def test_usage_rows_for_drift(client):
+    """Les lignes d'usage portent les caractéristiques de la formule (dérive), jamais la formule elle-même."""
+    body = {"latex": "x^2 - 5x + 6 = 0", "client": {"platform": "android", "app_version": "1.2.0"},
+            "escalation": {"reason": "ocr_low_confidence", "ocr_confidence": 0.42}}
+    assert client.post("/v1/solve", json=body, headers={"Authorization": "Bearer dev-token"}).status_code == 200
+    assert client.get("/admin/usage/rows").status_code == 401
+    rows = client.get("/admin/usage/rows?endpoint=solve", headers=ADMIN).json()
+    assert len(rows) == 1
+    extra = rows[0]["extra"]
+    assert extra["latex_len"] == 12 and extra["n_vars"] == 1 and extra["max_power"] == 2
+    assert extra["app_version"] == "1.2.0" and extra["ocr_confidence"] == 0.42
+    assert "x^2" not in str(rows[0])
+
+
+def test_latex_features():
+    from serving.gateway.features import latex_features
+
+    f = latex_features(r"\lim_{x\to 0}\frac{\sin(7x)}{x}")
+    assert f == {"latex_len": 30, "n_vars": 1, "n_frac": 1, "max_power": 1, "n_functions": 1}
+    assert latex_features(r"\frac{d}{dx}(x^{3}e^{x})")["n_vars"] == 1  # d et e ne sont pas des inconnues
+    assert latex_features(None)["latex_len"] == 0

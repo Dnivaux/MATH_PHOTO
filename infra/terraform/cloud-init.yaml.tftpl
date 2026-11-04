@@ -1,0 +1,30 @@
+#cloud-config
+# Rendu par Terraform (main.tf) : utilisateur ubuntu avec la clé générée, Docker, dépôt cloné, stack en profil ci,
+# et runner GitHub auto-hébergé (étiquette « staging ») si un jeton d'enregistrement est fourni.
+hostname: ${hostname}
+users:
+  - name: ubuntu
+    groups: [sudo, docker]
+    shell: /bin/bash
+    sudo: "ALL=(ALL) NOPASSWD:ALL"
+    ssh_authorized_keys:
+      - ${ssh_key}
+package_update: true
+packages: [docker.io, docker-compose-v2, git, make, curl, jq]
+runcmd:
+  - systemctl enable --now docker
+  - usermod -aG docker ubuntu
+  - git clone --branch ${repo_ref} ${repo_url} /opt/photo-maths
+  - cp /opt/photo-maths/.env.example /opt/photo-maths/.env
+  - chown -R ubuntu:ubuntu /opt/photo-maths
+  - cd /opt/photo-maths && docker compose --profile ci build
+  # jeu d'évaluation figé (graine fixe, identique à celui du PC) : le faux LLM y retrouve les problèmes
+  - cd /opt/photo-maths && docker compose --profile ci run --rm --no-deps -v /opt/photo-maths/data:/app/data gateway-ci python -m datagen.build_sets eval --per-type 50
+  - cd /opt/photo-maths && docker compose --profile ci up -d
+%{ if runner_token != "" ~}
+  - mkdir -p /opt/actions-runner && chown ubuntu:ubuntu /opt/actions-runner
+  - su - ubuntu -c "cd /opt/actions-runner && curl -fsSL -o runner.tgz https://github.com/actions/runner/releases/download/v${runner_version}/actions-runner-linux-x64-${runner_version}.tar.gz && tar xzf runner.tgz && rm runner.tgz"
+  - su - ubuntu -c "cd /opt/actions-runner && ./config.sh --unattended --replace --url ${trimsuffix(repo_url, ".git")} --token ${runner_token} --name ${hostname} --labels staging"
+  - cd /opt/actions-runner && ./svc.sh install ubuntu && ./svc.sh start
+%{ endif ~}
+final_message: "photo-maths : VM prête après $UPTIME s"

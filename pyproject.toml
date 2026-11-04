@@ -32,6 +32,8 @@ gpu = [
     "datasets>=3.0",
 ]
 dev = ["pytest>=8", "ruff>=0.6"]
+# test de charge (make load-test) et détection de dérive (make drift)
+ops = ["locust>=2.32", "evidently==0.7.23", "pandas>=2.2"]
 
 [build-system]
 requires = ["setuptools>=68"]

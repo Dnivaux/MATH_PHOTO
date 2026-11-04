@@ -369,13 +369,13 @@ La seconde version s'aligne sur le dossier : pas de Python sur le téléphone, e
 | Grille | Exigence | État | Commentaire |
 |---|---|---|---|
 | MLOps 0 | `docker compose up` lance tout | 🟢 Fait | `make up` : infra, vLLM (7B + LoRA du registry), explicateur GGUF, gateway. `make up-ci` sans GPU |
-| MLOps 1 | Déploiement auto sur une VM | 🔴 À faire | CI écrite (`.github/workflows/ci.yml`) ; ni VM ni CD |
+| MLOps 1 | Déploiement auto sur une VM | 🟡 Écrit | `.github/workflows/deploy.yml` : après une CI verte, le runner de la VM déploie le commit testé, vérifie (santé + résolution) et revient au commit précédent si la vérification échoue. À lancer : `make vm-up` |
 | MLOps 1 | Token dans le header | 🟢 Fait | `Authorization: Bearer`, clés par utilisateur et par appareil stockées hachées, révocables |
 | MLOps 1 | Suivi d'usage par utilisateur | 🟢 Fait | Table `usage`, `GET /admin/usage`, tableau de bord Grafana provisionné (usage par utilisateur, coût GPU estimé) |
-| MLOps 2 | Terraform | 🔴 À faire | |
-| MLOps 2 | Test de charge | 🔴 À faire | |
+| MLOps 2 | Terraform | 🟡 Écrit | `infra/terraform` (OpenTofu, libvirt/KVM) : VM Ubuntu 24.04, Docker, stack en profil ci, runner GitHub. Validation après installation de libvirt |
+| MLOps 2 | Test de charge | 🟢 Fait | Locust par paliers (`make load-test`, runs `load-*` dans MLflow). Deux goulots trouvés et corrigés : bac à sable limité à 2 cœurs, OCR serveur qui bloquait les fils de la gateway. Capacité : 64 utilisateurs simultanés, /v1/solve p95 1,7 s |
 | MLOps 2 | Interface utilisateur | 🟢 Fait | App Android du collègue |
-| MLOps 2 | Data drift | 🔴 À faire | Prometheus et Grafana en place (`/metrics`) : base du monitoring |
+| MLOps 2 | Data drift | 🟢 Fait | Evidently (`make drift`) : formules reçues face aux données d'entraînement, et fenêtre courante face à la précédente. Démonstration : trafic normal, aucune dérive ; trafic de limites seulement, 6 colonnes sur 6 en dérive |
 | MLOps 2 | MLflow pour versionner et mettre en prod | 🟢 Fait | Tracking, registry, alias, lignée. La stack sert les `champion` du registry, et `GET /v1/models` les distribue aux téléphones avec leur SHA-256 |
 | MLOps 3 | Quantization | 🟢 Fait (LLM) | GGUF F16 / Q8_0 / Q4_K_M avec imatrix. AWQ / FP8 du 7B serveur : à faire |
 | MLOps 3 | Canary, scaling, Kubernetes | 🔴 À faire | |
@@ -389,6 +389,40 @@ pruning du 1,5B, pruning de la largeur et du vocabulaire du 0,6B, AWQ du 7B, DAG
 aujourd'hui des cibles `make`), versionnement DVC.
 
 ---
+
+### 7.1 Test de charge (4 novembre)
+
+Locust (`infra/load/locustfile.py`) : des téléphones simulés, 8 résolutions pour 1 relecture OCR et 1 vérification
+de modèle, 1 à 3 s entre deux requêtes. Un run MLflow par palier (`eval/load_test.py`).
+
+| Utilisateurs | Avant correction : req/s, p95 /v1/solve | Après : req/s, p95 /v1/solve |
+|---|---|---|
+| 16 | 5,2 req/s, 1,6 s | — |
+| 32 | 9,1 req/s, 3,1 s | 10,5 req/s, 1,6 s |
+| 64 | 5,9 req/s, 13,3 s | **16,6 req/s, 1,7 s** (OCR asynchrone : 2,4 s) |
+| 128 | 5,5 req/s, 27,6 s | 22,9 req/s, 3,1 s (3,5 % d'échecs : OCR saturé) |
+
+Goulots, trouvés avec `docker stats` et les étapes mesurées par Prometheus :
+1. **Bac à sable** à 215 % de CPU, limité à 2 cœurs (un Python + SymPy par exécution) : passé à 8 (`SANDBOX_CPUS`).
+2. **OCR serveur** (TexTeller sur CPU, une photo à la fois, ~1 photo/s) : ses requêtes en attente occupaient les
+   fils de la gateway, jusqu'à ralentir `/v1/models` à 3,7 s. Appel rendu asynchrone : les résolutions ne
+   l'attendent plus. Reste à multiplier les instances OCR (montée en charge, MLOps 3).
+3. Ensuite : le GPU (99 % d'utilisation à 128 utilisateurs).
+
+### 7.2 Détection de dérive (4 novembre)
+
+`eval/drift.py` (Evidently), alimenté par `GET /admin/usage/rows` : la gateway garde pour chaque résolution les
+caractéristiques de la formule (longueur, variables, fractions, puissance, fonctions ; `serving/gateway/features.py`),
+jamais la formule. Deux comparaisons, un run MLflow et un rapport HTML chacune :
+
+| Scénario | Entrées face à l'entraînement | Production, fenêtre courante face à la précédente |
+|---|---|---|
+| Trafic normal (jeu d'évaluation) | 0 colonne sur 6 (distances 0,003 à 0,097, seuil 0,1) | — |
+| Limites seulement (`LOAD_TYPES=limit`) | **6 sur 6** (type : distance 0,65) | — |
+| 128 utilisateurs face à 64 | 0 sur 6 | latence seule (KS p = 8e-8) : juste, la charge a doublé |
+
+Bug du script trouvé en route : avec beaucoup de données, Evidently donne une distance (dérive si grande), pas
+une p-value (dérive si petite). Lecture corrigée, run précédent tagué `invalid`.
 
 ## 8. Reste à faire, par priorité
 

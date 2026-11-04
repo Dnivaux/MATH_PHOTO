@@ -55,4 +55,19 @@ eval-explain: ## make eval-explain NAME=baseline-qwen3-0.6b ROLE=baseline
 report: ## tableau de synthèse depuis MLflow
 	$(PY) -m eval.report
 
+VIRSH := virsh -c qemu:///system
+vm-prepare: ## une fois : pool de disques et réseau NAT par défaut de libvirt
+	$(VIRSH) pool-info default >/dev/null 2>&1 || ($(VIRSH) pool-define-as default dir --target /var/lib/libvirt/images && $(VIRSH) pool-start default && $(VIRSH) pool-autostart default)
+	$(VIRSH) net-info default | grep -q 'Active: *yes' || ($(VIRSH) net-start default && $(VIRSH) net-autostart default)
+vm-up: ## VM de staging (OpenTofu + KVM) : Docker, stack en profil ci, runner GitHub (infra/terraform/README.md)
+	cd infra/terraform && tofu init -input=false && tofu apply -auto-approve
+vm-down: ## détruit la VM de staging
+	cd infra/terraform && tofu destroy -auto-approve
+
+drift: ## dérive des requêtes reçues (Evidently) ; HOURS=168, ARGS="--include-load --fail-on-drift"
+	$(PY) -m eval.drift --hours $(or $(HOURS),168) $(ARGS)
+
+load-test: ## test de charge par paliers (stack lancée : make up) ; USERS="1 4 8 16 32" DURATION=60
+	$(PY) -m eval.load_test --users $(or $(USERS),1 4 8 16 32) --duration $(or $(DURATION),60)
+
 .PHONY: help infra-up infra-down up up-ci mlflow-hygiene env llamacpp env-check test contract mock data-eval data-train eval-code eval-passk eval-explain report

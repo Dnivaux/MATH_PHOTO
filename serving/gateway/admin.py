@@ -68,3 +68,9 @@ def revoke_key(key_id: int):
 @router.get("/usage")
 def get_usage(hours: float = 24, user: str | None = None):
     return usage.summary(hours, user)
+
+
+@router.get("/usage/rows")
+def get_usage_rows(hours: float = 24 * 7, endpoint: str | None = None, limit: int = 50_000):
+    """Lignes d'usage brutes (sans formule ni photo) : entrée de la détection de dérive (eval/drift.py)."""
+    return usage.rows(hours, endpoint, min(limit, 200_000))
