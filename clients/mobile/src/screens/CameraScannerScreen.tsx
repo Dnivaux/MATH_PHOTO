@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Pressable, StatusBar, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { Image, Pressable, StatusBar, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { useIsFocused } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Camera, PhotoFile, useCameraDevice, useCameraFormat, useCameraPermission } from 'react-native-vision-camera';
@@ -14,8 +14,11 @@ import { showSnackbar } from '../components/ui/Snackbar';
 import { useResizableBox } from '../hooks/useResizableBox';
 import { EngineStatus, FractionRect, MathEngine } from '../engine/MathEngine';
 import { fileToBase64, recognizeOnDevice } from '../services/ocr';
+import { ocrOnServer } from '../services/api';
+import { looksGarbled, normalizeOcrLatex } from '../engine/latexPreprocess';
 import { getSettings, subscribeSettings, updateSettings } from '../config';
 import { pendingCount } from '../pipeline/queue';
+import { rememberScan } from '../pipeline/scanImage';
 import { subscribeHistory } from '../state/history';
 import { camera, radius, space, TOUCH, type, useTheme } from '../theme';
 
@@ -64,13 +67,30 @@ export const CameraScannerScreen: React.FC<Props> = ({ navigation }) => {
 
   const [torch, setTorch] = useState<'off' | 'on'>('off');
   const [isProcessing, setIsProcessing] = useState(false);
-  const [scanned, setScanned] = useState<{ latex: string; confidence: number | null } | null>(null);
+  const [scanned, setScanned] = useState<{
+    latex: string;
+    confidence: number | null;
+    image: string | null;
+    /** device : lue par pix2tex sur le téléphone ; server : relue par TexTeller sur le serveur */
+    source: 'device' | 'server';
+  } | null>(null);
+  // étape de lecture en cours, et message quand aucune lecture n'est montrable
+  const [stage, setStage] = useState<'device' | 'server' | null>(null);
+  const [unreadable, setUnreadable] = useState<string | null>(null);
+  // photo prise, affichée à la place de l'aperçu pendant la lecture et tant que la formule lue est à l'écran :
+  // l'utilisateur voit qu'il peut bouger le téléphone
+  const [frozen, setFrozen] = useState<string | null>(null);
   const [engine, setEngine] = useState<EngineStatus>(MathEngine.status);
   const [pending, setPending] = useState(0);
   const [settings, setSettings] = useState(getSettings());
 
   useEffect(() => MathEngine.subscribe(st => setEngine({ ...st })), []);
   useEffect(() => subscribeSettings(setSettings), []);
+  useEffect(() => {
+    if (!focused) {
+      setFrozen(null);
+    }
+  }, [focused]);
   useEffect(() => {
     const refresh = () =>
       pendingCount()
@@ -94,18 +114,70 @@ export const CameraScannerScreen: React.FC<Props> = ({ navigation }) => {
     bottomLimit,
   });
 
+  /**
+   * Lecture d'une photo. Le téléphone lit d'abord (pix2tex, hors ligne). Si sa lecture est douteuse (confiance
+   * basse, charabia, formule que le moteur ne sait pas lire), le serveur relit la zone recadrée (TexTeller).
+   * Une lecture manifestement inexploitable n'est jamais montrée à l'utilisateur.
+   */
   const recognize = useCallback(async (base64: string, mime: string, crop?: FractionRect) => {
-    const res = await recognizeOnDevice(base64, mime, crop);
-    if (!res.latex) {
-      throw new Error('Je n’ai pas reconnu de formule. Recadre une seule ligne, bien éclairée.');
+    setUnreadable(null);
+    setStage('device');
+    try {
+      const res = await recognizeOnDevice(base64, mime, crop);
+      const s = getSettings();
+      const garbled = !res.latex || looksGarbled(res.latex);
+      let doubtful = garbled || res.confidence < s.ocrMinConfidence;
+      if (!doubtful) {
+        const a = await MathEngine.analyze(res.latex).catch(() => null);
+        doubtful = !a?.valid;
+      }
+      if (!doubtful) {
+        setScanned({ latex: res.latex, confidence: res.confidence, image: res.image, source: 'device' });
+        return;
+      }
+      if (res.image && s.allowServer) {
+        setStage('server');
+        try {
+          const r = await ocrOnServer(res.image);
+          const latex = normalizeOcrLatex(r.latex);
+          if (latex && !looksGarbled(latex)) {
+            setScanned({ latex, confidence: null, image: res.image, source: 'server' });
+          } else {
+            setUnreadable('Même le serveur n’arrive pas à lire cette photo. Cadre une seule ligne, bien éclairée, sans reflet.');
+          }
+          return;
+        } catch {
+          // serveur injoignable : on se rabat sur la lecture du téléphone si elle est présentable
+        }
+      }
+      if (!garbled) {
+        setScanned({ latex: res.latex, confidence: res.confidence, image: res.image, source: 'device' });
+      } else {
+        setUnreadable(
+          s.allowServer
+            ? 'Je n’arrive pas à lire cette photo sans connexion. Reconnecte-toi pour que le serveur la relise, ou saisis la formule.'
+            : 'Je n’arrive pas à lire cette photo. Active l’envoi au serveur dans les réglages pour qu’il la relise, ou saisis la formule.',
+        );
+      }
+    } finally {
+      setStage(null);
     }
-    setScanned({ latex: res.latex, confidence: res.confidence });
   }, []);
 
-  const onError = (e: any) => showSnackbar(e?.message || 'Impossible de lire la formule.', { offset: CONTROLS_HEIGHT });
+  const onError = (e: any) => {
+    setFrozen(null);
+    showSnackbar(e?.message || 'Impossible de lire la formule.', { offset: CONTROLS_HEIGHT });
+  };
 
   const handleCapture = useCallback(async () => {
     if (!cameraRef.current || isProcessing) {
+      return;
+    }
+    if (frozen) {
+      // photo figée à l'écran : le déclencheur relance l'aperçu pour une nouvelle prise
+      setFrozen(null);
+      setScanned(null);
+      setUnreadable(null);
       return;
     }
     try {
@@ -115,6 +187,7 @@ export const CameraScannerScreen: React.FC<Props> = ({ navigation }) => {
         updateSettings({ cameraTipSeen: true });
       }
       const photo: PhotoFile = await cameraRef.current.takePhoto({ flash: torch, enableShutterSound: false });
+      setFrozen(`file://${photo.path}`);
       const rect = box.getCropRect();
       // la photo peut être dans l'orientation du capteur (paysage) : on raisonne dans celle de l'écran
       const portraitScreen = screenHeight >= screenWidth;
@@ -128,7 +201,7 @@ export const CameraScannerScreen: React.FC<Props> = ({ navigation }) => {
     } finally {
       setIsProcessing(false);
     }
-  }, [isProcessing, torch, screenWidth, screenHeight, box, recognize]);
+  }, [isProcessing, frozen, torch, screenWidth, screenHeight, box, recognize]);
 
   const handlePickImage = async () => {
     try {
@@ -196,11 +269,14 @@ export const CameraScannerScreen: React.FC<Props> = ({ navigation }) => {
         style={StyleSheet.absoluteFill}
         device={device}
         format={format}
-        isActive={focused}
+        isActive={focused && !frozen}
         photo
         torch={torch}
         enableZoomGesture
       />
+      {frozen ? (
+        <Image source={{ uri: frozen }} style={StyleSheet.absoluteFill} resizeMode="cover" accessibilityLabel="Photo prise" />
+      ) : null}
       <CameraOverlayMask
         screenWidth={screenWidth}
         screenHeight={screenHeight}
@@ -254,8 +330,23 @@ export const CameraScannerScreen: React.FC<Props> = ({ navigation }) => {
         threshold={settings.ocrMinConfidence}
         bottom={cardBottom}
         onEdit={latex => openCalculator(latex)}
-        onSolve={latex => navigation.navigate('Solution', { latex, ocrConfidence: scanned?.confidence ?? null })}
-        onDismiss={() => setScanned(null)}
+        onSolve={latex => {
+          rememberScan(latex, scanned?.image);
+          navigation.navigate('Solution', { latex, ocrConfidence: scanned?.confidence ?? null });
+        }}
+        onDismiss={() => {
+          setScanned(null);
+          setUnreadable(null);
+          setFrozen(null);
+        }}
+        stage={stage}
+        source={scanned?.source ?? 'device'}
+        unreadable={unreadable}
+        onType={() => {
+          setUnreadable(null);
+          setFrozen(null);
+          openCalculator();
+        }}
       />
 
       <CameraControls

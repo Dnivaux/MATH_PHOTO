@@ -22,12 +22,13 @@ import mlflow
 from PIL import Image
 
 from common import tracking
+from serving.ocr.text import canonicalize, strip_delimiters  # noqa: F401  (strip_delimiters : tests)
 
 TOKEN_RE = re.compile(r"\\[a-zA-Z]+|\\.|[^\s]")
 
 
 def normalize(latex: str) -> str:
-    s = latex.strip().strip("$")
+    s = strip_delimiters(latex).strip()
     s = re.sub(r"\\(left|right|displaystyle|mathrm|operatorname|limits)\b", "", s)
     s = re.sub(r"\\[,;:! ]", "", s)
     s = s.replace("\\dfrac", "\\frac").replace("\\cdot", "\\times")
@@ -61,7 +62,7 @@ def equivalent(pred: str, ref: str) -> bool:
         from serving.sandbox.runner import exprs_equal
 
         def expr(s):
-            s = normalize_latex(s)
+            s = normalize_latex(strip_delimiters(s))
             if "=" in s:
                 lhs, rhs = s.split("=", 1)
                 return parse(lhs) - parse(rhs), True
@@ -88,7 +89,10 @@ def load_pix2tex():
 
 
 def load_texteller(device: str):
+    import torch
     from texteller import img2latex, load_model, load_tokenizer
+
+    device = torch.device(device)  # img2latex compare device.type
 
     model, tok = load_model(), load_tokenizer()
     try:
@@ -108,12 +112,52 @@ def load_texteller(device: str):
     return predict
 
 
+def load_p2t_mfr(repo: str, threads: int):
+    """pix2text-mfr (TrOCR, MIT), en ONNX Runtime sur CPU : proche des conditions du téléphone."""
+    import onnxruntime as ort
+    from optimum.onnxruntime import ORTModelForVision2Seq
+    from transformers import TrOCRProcessor
+
+    so = ort.SessionOptions()
+    so.intra_op_num_threads = threads
+    processor = TrOCRProcessor.from_pretrained(repo)
+    model = ORTModelForVision2Seq.from_pretrained(repo, use_cache=False, session_options=so)
+
+    def predict(img: Image.Image) -> str:
+        pixel_values = processor(images=[img], return_tensors="pt").pixel_values
+        ids = model.generate(pixel_values, max_new_tokens=256)
+        return processor.batch_decode(ids, skip_special_tokens=True)[0]
+
+    return predict
+
+
+def load_pp_formulanet(name: str, threads: int):
+    """PP-FormulaNet (PaddleOCR 3, Apache 2.0), sur CPU. Venv séparé : .venv-paddle."""
+    from paddleocr import FormulaRecognition
+
+    model = FormulaRecognition(model_name=name, device="cpu", cpu_threads=threads)
+
+    def predict(img: Image.Image) -> str:
+        with tempfile.NamedTemporaryFile(suffix=".png") as f:
+            img.save(f.name)
+            out = list(model.predict(input=f.name, batch_size=1))
+        return out[0]["rec_formula"]
+
+    return predict
+
+
+MODELS = {"pix2tex": "pix2tex", "texteller": "texteller",
+          "p2t-mfr": "breezedeus/pix2text-mfr", "p2t-mfr-1.5": "breezedeus/pix2text-mfr-1.5",
+          "pp-formulanet-plus-s": "PP-FormulaNet_plus-S", "pp-formulanet-s": "PP-FormulaNet-S"}
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--model", choices=["pix2tex", "texteller"], required=True)
+    ap.add_argument("--model", choices=sorted(MODELS), required=True)
     ap.add_argument("--data", required=True, help="dossier avec labels.jsonl")
     ap.add_argument("--device", default="cuda")
     ap.add_argument("--limit", type=int, default=None)
+    ap.add_argument("--threads", type=int, default=4, help="ONNX Runtime sur CPU (modèles p2t-mfr)")
     args = ap.parse_args()
 
     data = Path(args.data)
@@ -121,7 +165,14 @@ def main() -> None:
     labels = [l for l in labels if (data / l["file"]).exists()][: args.limit]
     if not labels:
         raise SystemExit(f"aucune image étiquetée trouvée dans {data}")
-    predict = load_pix2tex() if args.model == "pix2tex" else load_texteller(args.device)
+    if args.model == "pix2tex":
+        predict = load_pix2tex()
+    elif args.model == "texteller":
+        predict = load_texteller(args.device)
+    elif args.model.startswith("pp-"):
+        predict, args.device = load_pp_formulanet(MODELS[args.model], args.threads), f"cpu-paddle-{args.threads}t"
+    else:
+        predict, args.device = load_p2t_mfr(MODELS[args.model], args.threads), f"cpu-onnx-{args.threads}t"
     predict(Image.open(data / labels[0]["file"]).convert("RGB"))  # chauffe (chargement CUDA)
 
     rows = []
@@ -129,12 +180,13 @@ def main() -> None:
         img = Image.open(data / l["file"]).convert("RGB")
         t = time.perf_counter()
         try:
-            pred = predict(img)
+            raw = predict(img)
         except Exception as e:  # noqa: BLE001
-            pred = f"<erreur {type(e).__name__}>"
+            raw = f"<erreur {type(e).__name__}>"
+        pred = canonicalize(raw)  # même mise en forme pour tous les modèles (et pour le serveur)
         ms = (time.perf_counter() - t) * 1e3
         ref_t, pred_t = tokens(l["latex"]), tokens(pred)
-        rows.append({**l, "pred": pred, "ms": ms, "exact": normalize(pred) == normalize(l["latex"]),
+        rows.append({**l, "pred": pred, "pred_raw": raw, "ms": ms, "exact": normalize(pred) == normalize(l["latex"]),
                      "equivalent": equivalent(pred, l["latex"]),
                      "token_error_rate": edit_distance(pred_t, ref_t) / max(1, len(ref_t))})
 

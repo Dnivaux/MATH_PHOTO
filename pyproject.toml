@@ -16,7 +16,8 @@ dependencies = [
     "boto3>=1.34",
     "python-dotenv>=1.0",
     "tqdm>=4.66",
-    "sqlalchemy>=2.0",  # clés et usage de la gateway (SQLite en local, Postgres en conteneur)
+    "sqlalchemy>=2.0",
+    "prometheus-client>=0.20",  # GET /metrics de la gateway  # clés et usage de la gateway (SQLite en local, Postgres en conteneur)
 ]
 
 [project.optional-dependencies]

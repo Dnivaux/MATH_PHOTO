@@ -44,7 +44,7 @@ gateway (`GET /v1/models/android/latest?role=explainer`, pas encore dans la gate
 réglages développeur, puis vérifie son SHA-256. Copie manuelle :
 
 ```bash
-adb push explainer-0.6b-p20-q4_k_m.gguf /sdcard/Android/data/com.photomathclone/files/models/explainer.gguf
+adb push explainer-0.6b-p20-q4_k_m.gguf /sdcard/Android/data/com.photomaths/files/models/explainer.gguf
 ```
 
 Le prompt est celui de l'entraînement (`common/prompts.py`, gabarit Qwen3 sans thinking) ; un test le compare

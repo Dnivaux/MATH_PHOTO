@@ -16,6 +16,11 @@
       android:theme="@style/AppTheme"
       android:supportsRtl="true"
       android:usesCleartextTraffic="true">
+      <!-- llama.rn : sur Snapdragon 8 Gen 1+ (Adreno + Hexagon), il charge sa variante OpenCL / Hexagon, qui a
+           besoin de ces bibliothèques du fabricant. Android ne les expose qu'aux apps qui les déclarent : sans
+           ces lignes, l'app plante au premier chargement du modèle (UnsatisfiedLinkError libcdsprpc.so). -->
+      <uses-native-library android:name="libOpenCL.so" android:required="false" />
+      <uses-native-library android:name="libcdsprpc.so" android:required="false" />
       <activity
         android:name=".MainActivity"
         android:label="@string/app_name"

@@ -66,7 +66,9 @@ class ClientInfo(BaseModel):
 
 class SolveRequest(BaseModel):
     latex: str | None = Field(None, max_length=2000, examples=["x^{2} - 5 x + 6 = 0"])
-    image_base64: str | None = Field(None, description="JPEG/PNG en base64 (OCR serveur)")
+    image_base64: str | None = Field(None, max_length=11_000_000, description=(
+        "JPEG/PNG en base64, recadré sur la formule (8 Mo max). Relu par l'OCR serveur quand il n'y a pas de LaTeX, "
+        "ou quand le client escalade pour ocr_low_confidence, invalid_latex ou user_request"))
     type_hint: ProblemType | None = None
     want_code: bool = Field(False, description="true pour l'ordinateur : renvoie le code exécuté")
     escalation: Escalation | None = None
@@ -84,6 +86,8 @@ class Problem(BaseModel):
     type: ProblemType
     variables: list[str]
     route: Literal["local", "server"] = Field(description="Où ce type de problème est censé être traité")
+    latex_source: Literal["client", "server_ocr"] = Field(
+        "client", description="server_ocr : la photo envoyée a été relue par le serveur, et c'est cette lecture qui a été résolue")
 
 
 class Result(BaseModel):
@@ -169,3 +173,18 @@ class Health(BaseModel):
     api_version: str = API_VERSION
     mock: bool = False
     llm: bool | None = None
+
+
+class OcrRequest(BaseModel):
+    """Relecture d'une photo par le serveur (TexTeller), quand la lecture du téléphone est douteuse."""
+    image_base64: str = Field(max_length=11_000_000, description="JPEG/PNG en base64, recadré sur la formule (8 Mo max)")
+    client: ClientInfo = ClientInfo()
+
+
+class OcrResponse(BaseModel):
+    api_version: str = API_VERSION
+    request_id: str
+    latex: str = Field(description="Formule lue par le serveur (délimiteurs retirés)")
+    model: str = "texteller"
+    ms: float
+

@@ -17,6 +17,7 @@ import { cleanLatex } from '../engine/latexPreprocess';
 import { statementFor } from '../explain/prompt';
 import * as api from '../services/api';
 import { logEvent } from '../storage/db';
+import { scanImageFor } from './scanImage';
 import { KIND_LABELS, Solution, SolveError, Timing } from './types';
 
 export interface SolveOptions {
@@ -130,8 +131,10 @@ async function fromServer(latex: string, res: api.SolveResponse, timings: Timing
     throw new SolveError(api.errorMessage(res.error?.code, res.error?.message), 'server');
   }
   const type = res.problem.type;
-  // garde-fou : une réponse pour une autre formule (serveur défaillant, gateway factice) n'est pas affichée
-  if (res.problem.latex && !(await MathEngine.sameProblem(latex, res.problem.latex, type).catch(() => true))) {
+  // garde-fou : une réponse pour une autre formule (serveur défaillant, gateway factice) n'est pas affichée,
+  // sauf si le serveur a relu la photo : sa lecture remplace alors celle du téléphone
+  const reread = res.problem.latex_source === 'server_ocr';
+  if (!reread && res.problem.latex && !(await MathEngine.sameProblem(latex, res.problem.latex, type).catch(() => true))) {
     throw new SolveError(
       `Le serveur a répondu pour une autre formule (${res.problem.latex}) : sa réponse a été écartée. Réessaie, ou corrige la formule.`,
       'server',
@@ -153,7 +156,10 @@ async function fromServer(latex: string, res: api.SolveResponse, timings: Timing
     answers: [],
     solutions: [],
     escalation,
-    warnings: res.status === 'unverified' ? ['Le serveur n’a pas pu confirmer ce résultat par une seconde méthode.'] : [],
+    warnings: [
+      ...(reread ? ['La photo a été relue par le serveur : vérifie que la formule affichée est bien la tienne.'] : []),
+      ...(res.status === 'unverified' ? ['Le serveur n’a pas pu confirmer ce résultat par une seconde méthode.'] : []),
+    ],
     timings,
   };
   if (type === 'equation') {
@@ -201,6 +207,8 @@ export async function solve(input: string, opts: SolveOptions = {}): Promise<Sol
   progress('Lecture de la formule…');
   const a = await timed(timings, 'Analyse (CortexJS)', () => MathEngine.analyze(latex));
   const lowConfidence = opts.ocrConfidence != null && opts.ocrConfidence < settings.ocrMinConfidence;
+  // zone de la photo lue (si la formule vient tout juste d'être scannée, sans correction à la main)
+  const image = scanImageFor(input);
 
   let reason: api.EscalationReason | null = null;
   let detail: string | null = null;
@@ -220,6 +228,10 @@ export async function solve(input: string, opts: SolveOptions = {}): Promise<Sol
   } else if (a.route === 'server') {
     reason = a.valid ? 'out_of_local_scope' : 'invalid_latex';
     detail = a.valid ? (a.label ?? a.kind) : 'LaTeX non reconnu par CortexJS';
+  } else if (image && settings.allowServer) {
+    // lecture de la photo inexploitable : le serveur la relit plutôt que d'abandonner
+    reason = 'invalid_latex';
+    detail = 'formule lue non prise en charge, photo relue par le serveur';
   } else {
     throw new SolveError(
       a.reason && a.kind === 'arithmetic'
@@ -238,6 +250,7 @@ export async function solve(input: string, opts: SolveOptions = {}): Promise<Sol
     );
   }
 
+  const sendImage = reason === 'ocr_low_confidence' || reason === 'invalid_latex' || reason === 'user_request';
   const escalation = { reason, detail };
   progress('Envoi au serveur…');
   logEvent('escalation', { reason, kind: a.kind, ocrConfidence: opts.ocrConfidence ?? null });
@@ -249,6 +262,8 @@ export async function solve(input: string, opts: SolveOptions = {}): Promise<Sol
           latex,
           type_hint: a.apiType,
           escalation: { reason: reason!, detail, ocr_confidence: opts.ocrConfidence ?? null },
+          // photo seulement si la lecture du téléphone est douteuse : le serveur la relit (TexTeller)
+          ...(image && sendImage ? { image_base64: image } : {}),
         },
         opts.signal,
       ),

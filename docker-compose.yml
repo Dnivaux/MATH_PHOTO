@@ -6,7 +6,36 @@
 #
 # Les modèles servis sont les `champion` du registry MLflow, téléchargés par `model-fetch` au démarrage.
 # UI MLflow : http://localhost:5000   Console MinIO : http://localhost:9001   Gateway : http://localhost:8100
+# Grafana : http://localhost:3000 (admin / GRAFANA_ADMIN_PASSWORD)   Prometheus : http://localhost:9090
 name: photo-maths
+
+x-gateway: &gateway
+  # Partie commune des deux gateways (une par profil : les dépendances diffèrent)
+  build: {context: ., dockerfile: serving/gateway/Dockerfile}
+  environment: &gateway-env
+    VLLM_BASE_URL: http://vllm:8000/v1
+    VLLM_MODEL: teacher-ft
+    EXPLAIN_BASE_URL: http://explainer:8000/v1
+    EXPLAIN_MODEL: explainer
+    MLFLOW_TRACKING_URI: http://mlflow:5000
+    GATEWAY_TOKENS: ${GATEWAY_TOKENS:-dev-token}
+    # modèle d'explication distribué aux clients et servi en mode léger (le même)
+    MODEL_ROLES: '{"android/explainer": "${EXPLAINER_REGISTRY:-explainer-0.6b-p20-gguf}", "ios/explainer": "${EXPLAINER_REGISTRY:-explainer-0.6b-p20-gguf}", "desktop/explainer": "${EXPLAINER_REGISTRY:-explainer-0.6b-p20-gguf}"}'
+    GATEWAY_ADMIN_TOKEN: ${GATEWAY_ADMIN_TOKEN:-}
+    GATEWAY_DB_URL: postgresql+psycopg2://mlflow:${POSTGRES_PASSWORD:-mlflow}@postgres:5432/gateway
+    SANDBOX_URL: http://sandbox:8200
+    SANDBOX_TOKEN: ${SANDBOX_TOKEN:-change-me}
+  networks: [default, sandbox-net]
+  volumes:
+    - registry:/registry:ro
+    - modelcache:/cache
+  ports:
+    - "8100:8100"
+  healthcheck:
+    test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8100/health')"]
+    interval: 10s
+    retries: 30
+  restart: unless-stopped
 
 services:
   postgres:
@@ -151,7 +180,7 @@ services:
       model-fetch:
         condition: service_completed_successfully
     command: ["-m", "/registry/${EXPLAINER_REGISTRY:-explainer-0.6b-p20-gguf}/current.gguf", "--alias", "explainer", "--host", "0.0.0.0",
-              "--port", "8000", "--jinja", "-c", "4096", "-t", "${EXPLAIN_THREADS:-8}", "--parallel", "4"]
+              "--port", "8000", "--jinja", "-c", "4096", "-t", "${EXPLAIN_THREADS:-8}", "--parallel", "4", "--metrics"]
     volumes:
       - registry:/registry:ro
     ports:
@@ -159,6 +188,21 @@ services:
     healthcheck:  # celui de l'image vise le port 8080
       test: ["CMD", "curl", "-sf", "http://localhost:8000/health"]
       interval: 10s
+      retries: 6
+    restart: unless-stopped
+
+  ocr:
+    # OCR serveur (TexTeller, CPU) : relit les photos que le téléphone a lues avec peu de certitude.
+    build: {context: ., dockerfile: serving/ocr/Dockerfile}
+    profiles: [gpu]
+    environment:
+      OCR_THREADS: ${OCR_THREADS:-4}
+    volumes:
+      - ${HF_HOME:-~/.cache/huggingface}:/hf:ro   # poids TexTeller déjà téléchargés par .venv-ocr
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8300/health')"]
+      interval: 10s
+      start_period: 120s
       retries: 6
     restart: unless-stopped
 
@@ -172,6 +216,28 @@ services:
     networks:
       default:
         aliases: [vllm, explainer]
+
+  sandbox:
+    # Exécution du code généré (dossier, phase 5). Réseau interne seulement : ni Internet, ni Postgres, ni MLflow.
+    build: {context: ., dockerfile: serving/gateway/Dockerfile}
+    profiles: [gpu, ci]
+    command: ["uvicorn", "serving.sandbox.service:app", "--host", "0.0.0.0", "--port", "8200"]
+    environment:
+      SANDBOX_TOKEN: ${SANDBOX_TOKEN:-change-me}
+    networks: [sandbox-net]
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    pids_limit: 128
+    mem_limit: 3g
+    cpus: 2
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8200/health')"]
+      interval: 10s
+      retries: 10
+    restart: unless-stopped
 
   gateway-db:
     # Base `gateway` (clés hachées, usage par utilisateur) dans le Postgres de MLflow, créée si absente.
@@ -190,46 +256,75 @@ services:
         || psql -h postgres -U mlflow -c "CREATE DATABASE gateway"
 
   gateway:
-    build: {context: ., dockerfile: serving/gateway/Dockerfile}
-    profiles: [gpu, ci]
+    <<: *gateway
+    profiles: [gpu]
     depends_on:
       mlflow:
         condition: service_healthy
       gateway-db:
         condition: service_completed_successfully
+      sandbox:
+        condition: service_healthy
       vllm:
         condition: service_started
-        required: false
       explainer:
         condition: service_started
-        required: false
+      ocr:
+        condition: service_started
+    environment:
+      <<: *gateway-env
+      OCR_URL: http://ocr:8300
+
+  gateway-ci:
+    # Profil ci : mêmes réglages, le faux LLM répond sous les noms `vllm` et `explainer`
+    <<: *gateway
+    profiles: [ci]
+    depends_on:
+      mlflow:
+        condition: service_healthy
+      gateway-db:
+        condition: service_completed_successfully
+      sandbox:
+        condition: service_healthy
       fake-llm:
         condition: service_started
-        required: false
-    environment:
-      VLLM_BASE_URL: http://vllm:8000/v1
-      VLLM_MODEL: teacher-ft
-      EXPLAIN_BASE_URL: http://explainer:8000/v1
-      EXPLAIN_MODEL: explainer
-      MLFLOW_TRACKING_URI: http://mlflow:5000
-      GATEWAY_TOKENS: ${GATEWAY_TOKENS:-dev-token}
-      # modèle d'explication distribué aux clients et servi en mode léger (le même)
-      MODEL_ROLES: '{"android/explainer": "${EXPLAINER_REGISTRY:-explainer-0.6b-p20-gguf}", "ios/explainer": "${EXPLAINER_REGISTRY:-explainer-0.6b-p20-gguf}", "desktop/explainer": "${EXPLAINER_REGISTRY:-explainer-0.6b-p20-gguf}"}'
-      GATEWAY_ADMIN_TOKEN: ${GATEWAY_ADMIN_TOKEN:-}
-      GATEWAY_DB_URL: postgresql+psycopg2://mlflow:${POSTGRES_PASSWORD:-mlflow}@postgres:5432/gateway
+
+  # ---- Monitoring (profils gpu et ci) : http://localhost:3000 (Grafana), http://localhost:9090 (Prometheus)
+
+  prometheus:
+    image: prom/prometheus:v3.5.0@sha256:63805ebb8d2b3920190daf1cb14a60871b16fd38bed42b857a3182bc621f4996
+    profiles: [gpu, ci]
     volumes:
-      - registry:/registry:ro
-      - modelcache:/cache
+      - ./infra/monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - promdata:/prometheus
     ports:
-      - "8100:8100"
-    healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8100/health')"]
-      interval: 10s
-      retries: 30
+      - "9090:9090"
     restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:12.1.0@sha256:6ac590e7cabc2fbe8d7b8fc1ce9c9f0582177b334e0df9c927ebd9670469440f
+    profiles: [gpu, ci]
+    depends_on: [prometheus, gateway-db]
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/photo-maths.json
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-mlflow}   # lu par la source de données provisionnée
+    volumes:
+      - ./infra/monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./infra/monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafanadata:/var/lib/grafana
+    ports:
+      - "3000:3000"
+    restart: unless-stopped
+
+networks:
+  sandbox-net:
+    internal: true   # aucune sortie vers l'extérieur
 
 volumes:
   pgdata:
   miniodata:
   registry:
   modelcache:
+  promdata:
+  grafanadata:

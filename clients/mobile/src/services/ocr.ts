@@ -1,5 +1,6 @@
 /**
- * OCR sur le téléphone : pix2tex INT8 dans le moteur embarqué. La photo ne quitte pas l'appareil.
+ * OCR sur le téléphone : pix2tex INT8 dans le moteur embarqué. La photo ne quitte l'appareil que si la lecture
+ * est incertaine et que l'utilisateur lance la résolution : la zone recadrée est alors relue par le serveur.
  */
 import { FractionRect, MathEngine } from '../engine/MathEngine';
 import { normalizeOcrLatex } from '../engine/latexPreprocess';
@@ -13,6 +14,8 @@ export interface OcrResult {
   ms: number;
   inferenceMs: number;
   model: string;
+  /** zone lue (JPEG base64), gardée en mémoire seulement */
+  image: string | null;
 }
 
 /** Lit un fichier local (photo) en base64, sans module natif supplémentaire */
@@ -37,6 +40,7 @@ export async function recognizeOnDevice(base64: string, mime = 'image/jpeg', cro
     ms: Date.now() - t0,
     inferenceMs: r.inferenceMs,
     model: r.model,
+    image: r.image ?? null,
   };
   logEvent('ocr', {
     ms: out.ms,

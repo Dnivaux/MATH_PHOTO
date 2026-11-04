@@ -5,7 +5,7 @@
  *  1. la gateway : GET /v1/models/android/latest?role=explainer (manifeste : url, sha256, taille) ;
  *  2. une adresse directe (réglages, développement) ;
  *  3. un fichier copié par adb dans le dossier de l'app :
- *       adb push explainer-0.6b-p20-q4_k_m.gguf /sdcard/Android/data/com.photomathclone/files/models/explainer.gguf
+ *       adb push explainer-0.6b-p20-q4_k_m.gguf /sdcard/Android/data/com.photomaths/files/models/explainer.gguf
  */
 import RNFS from 'react-native-fs';
 import { getSettings } from '../config';

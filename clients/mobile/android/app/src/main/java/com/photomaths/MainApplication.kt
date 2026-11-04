@@ -1,4 +1,4 @@
-package com.photomathclone
+package com.photomaths
 
 import android.app.Application
 import com.facebook.react.PackageList

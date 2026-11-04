@@ -58,3 +58,25 @@ def test_key_lifecycle_and_usage(client):
 
 def test_unknown_key_rejected(client):
     assert client.post("/v1/solve", json={"latex": "x=1"}, headers={"Authorization": "Bearer pm_nimporte"}).status_code == 401
+
+
+def test_metrics_exposed(client):
+    client.post("/v1/solve", json={"latex": "x^2 - 5x + 6 = 0", "client": {"platform": "android"}},
+                headers={"Authorization": "Bearer dev-token"})
+    text = client.get("/metrics").text
+    assert 'gateway_requests_total{endpoint="solve"' in text and 'platform="android"' in text
+    assert 'gateway_llm_seconds_total{endpoint="solve",user="dev"}' in text
+
+
+def test_ocr_endpoint(client, monkeypatch):
+    auth = {"Authorization": "Bearer dev-token"}
+    assert client.post("/v1/ocr", json={"image_base64": "aW1n"}).status_code == 401
+    monkeypatch.setattr(gateway, "OCR_URL", None)
+    assert client.post("/v1/ocr", json={"image_base64": "aW1n"}, headers=auth).status_code == 503
+    monkeypatch.setattr(gateway, "OCR_URL", "http://ocr:8300")
+    monkeypatch.setattr(gateway, "_read_image", lambda b64: "2x^{2}-3x-5=0")
+    r = client.post("/v1/ocr", json={"image_base64": "aW1n", "client": {"platform": "android"}}, headers=auth)
+    assert r.status_code == 200 and r.json()["latex"] == "2x^{2}-3x-5=0"
+    monkeypatch.setattr(gateway, "_read_image", lambda b64: (_ for _ in ()).throw(OSError()))
+    assert client.post("/v1/ocr", json={"image_base64": "aW1n"}, headers=auth).status_code == 502
+    assert 'gateway_requests_total{endpoint="ocr"' in client.get("/metrics").text

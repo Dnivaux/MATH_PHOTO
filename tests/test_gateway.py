@@ -36,3 +36,36 @@ def test_pipeline_answer_mismatch():
 def test_pipeline_parse_error():
     resp = pipeline.solve(SolveRequest(latex="\\frac{{{"), lambda m: "")
     assert resp.status == "error"
+
+
+def test_server_ocr_rereads_doubtful_photo():
+    """Lecture du téléphone douteuse + photo : la relecture serveur est résolue, sans l'indice de type du client."""
+    ref = from_latex("2x^2 - 3x - 5 = 0")["reference_code"]
+    req = SolveRequest(latex=r"\begin{array}{c}\hat{U}\end{array}", image_base64="aW1n", type_hint="limit",
+                       escalation={"reason": "ocr_low_confidence", "ocr_confidence": 0.4})
+    resp = pipeline.solve(req, lambda m: f"```python\n{ref}print(result)\n```", read_image=lambda b64: r"2x^{2}-3x-5=0")
+    assert resp.status == "ok" and resp.problem.latex_source == "server_ocr" and resp.problem.type.value == "equation"
+
+
+def test_server_ocr_falls_back_to_client_latex():
+    ref = from_latex("x^2 - 5x + 6 = 0")["reference_code"]
+    gen = lambda m: f"```python\n{ref}print(result)\n```"
+    req = SolveRequest(latex="x^2 - 5x + 6 = 0", image_base64="aW1n", escalation={"reason": "user_request"})
+    # OCR serveur illisible, puis injoignable : la lecture du client est gardée
+    for reader in (lambda b64: r"\frac{{{", lambda b64: (_ for _ in ()).throw(OSError())):
+        resp = pipeline.solve(req, gen, read_image=reader)
+        assert resp.status == "ok" and resp.problem.latex_source == "client"
+    # escalade pour une autre raison : la photo n'est pas relue
+    req2 = SolveRequest(latex="x^2 - 5x + 6 = 0", image_base64="aW1n", escalation={"reason": "out_of_local_scope"})
+    assert pipeline.solve(req2, gen, read_image=lambda b64: "faux").problem.latex_source == "client"
+
+
+def test_image_only_without_ocr_service():
+    resp = pipeline.solve(SolveRequest(image_base64="aW1n"), lambda m: "")
+    assert resp.status == "error" and resp.error.code.value == "image_not_supported"
+
+
+def test_server_ocr_error_reports_its_reading():
+    req = SolveRequest(latex=r"\hat{U}\oplus", image_base64="aW1n", escalation={"reason": "ocr_low_confidence"})
+    resp = pipeline.solve(req, lambda m: "", read_image=lambda b64: r"x=\frac{-b\pm\sqrt{b^{2}-4ac}}{2a}")
+    assert resp.status == "error" and "photo relue par le serveur" in resp.error.message and "b^{2}" in resp.error.message

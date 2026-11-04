@@ -171,3 +171,24 @@ export function normalizeOcrLatex(raw: string): string {
   }
   return cleanLatex(s);
 }
+
+/**
+ * Commandes qui n'apparaissent jamais dans un exercice du périmètre (collège à début du supérieur) mais que
+ * pix2tex produit quand il ne sait pas lire : polices exotiques, accents sur des capitales, boîtes et
+ * fantômes, tableaux. Une seule suffit pour juger la lecture inexploitable.
+ */
+const GARBLED_COMMANDS =
+  /\\(mathfrak|mathscr|cal|mathcal|jmath|imath|hat|check|breve|acute|grave|ddot|dot|widetilde|tilde|overline|underline|overbrace|underbrace|phantom|vphantom|hphantom|nulldelimiterspace|kern|protect|boxed|fbox|star|oplus|otimes|odot|circledast|wedge|vee|varrho|varsigma|wp|Re|Im|aleph|beth|stackrel|overset|underset|mid|ddots|vdots|bf|it|rm|sf|tt)(?![a-zA-Z])/;
+
+/** Vrai si la lecture de l'OCR est manifestement inexploitable : il ne faut pas la montrer telle quelle. */
+export function looksGarbled(latex: string): boolean {
+  const s = latex.trim();
+  if (!s || s.length > 200) {
+    return true; // vide, ou bien trop long pour une ligne d'exercice (sortie qui boucle)
+  }
+  if (GARBLED_COMMANDS.test(s) || /\\begin\{array\}/.test(s)) {
+    return true; // (un système s'écrit \begin{cases} : gardé)
+  }
+  // indices ou exposants vides ou réduits à un signe : x_{*}, {2-}^{2-}
+  return /[_^]\{\s*[*+\-−]?\s*\}|[_^]\{\s*\d*[-+*]\s*\}/.test(s);
+}

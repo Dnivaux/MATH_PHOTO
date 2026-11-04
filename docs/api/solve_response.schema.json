@@ -232,6 +232,16 @@
      ],
      "title": "Route",
      "type": "string"
+    },
+    "latex_source": {
+     "default": "client",
+     "description": "server_ocr : la photo envoyée a été relue par le serveur, et c'est cette lecture qui a été résolue",
+     "enum": [
+      "client",
+      "server_ocr"
+     ],
+     "title": "Latex Source",
+     "type": "string"
     }
    },
    "required": [

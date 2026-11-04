@@ -123,6 +123,7 @@
   "image_base64": {
    "anyOf": [
     {
+     "maxLength": 11000000,
      "type": "string"
     },
     {
@@ -130,7 +131,7 @@
     }
    ],
    "default": null,
-   "description": "JPEG/PNG en base64 (OCR serveur)",
+   "description": "JPEG/PNG en base64, recadré sur la formule (8 Mo max). Relu par l'OCR serveur quand il n'y a pas de LaTeX, ou quand le client escalade pour ocr_low_confidence, invalid_latex ou user_request",
    "title": "Image Base64"
   },
   "type_hint": {

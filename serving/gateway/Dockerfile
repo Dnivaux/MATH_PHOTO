@@ -7,7 +7,7 @@ RUN pip install --no-cache-dir \
       "sympy==1.14.0" "lark==1.2.2" "antlr4-python3-runtime==4.11.*" "pydantic==2.13.5" \
       "fastapi==0.136.3" "uvicorn[standard]==0.54.0" "httpx>=0.27" "openai==3.24.0" \
       "mlflow-skinny==3.16.1" "boto3>=1.34" "python-dotenv>=1.0" "tqdm>=4.66" \
-      "sqlalchemy==2.1.3" "psycopg2-binary==2.9.*"
+      "sqlalchemy==2.1.3" "psycopg2-binary==2.9.*" "prometheus-client==0.26.0"
 
 WORKDIR /app
 COPY common common

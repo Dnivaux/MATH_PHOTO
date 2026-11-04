@@ -6,6 +6,8 @@
   dangereux retirés à l'exécution (runner.py) : défense en profondeur
 - timeout de 5 s par défaut (dossier, phase 5)
 - réseau coupé si `unshare -rn` est disponible (namespaces utilisateur)
+- SANDBOX_URL défini (gateway en conteneur) : l'exécution part au service séparé (service.py), isolé par
+  docker compose ; l'analyse AST est refaite ici avant l'envoi
 """
 
 from __future__ import annotations
@@ -55,7 +57,21 @@ class ExecResult:
 
 def run_code(code: str, expected: dict | None = None, timeout: float = 5.0, mem_mb: int = 2048,
              no_network: bool = True) -> ExecResult:
-    """Exécute `code`. Si `expected` est fourni (champ `check` d'un problème), renvoie aussi `correct`."""
+    """Exécute `code`. Si `expected` est fourni (champ `check` d'un problème), renvoie aussi `correct`.
+    Avec SANDBOX_URL, l'exécution part au service séparé ; l'analyse AST est faite ici dans les deux cas."""
+    from serving.sandbox.ast_check import check_code
+
+    violations = check_code(code)
+    if violations:
+        return ExecResult("rejected", error="; ".join(violations)[:500], correct=False if expected else None)
+    if url := os.getenv("SANDBOX_URL"):
+        return _run_remote(url, code, expected, timeout, mem_mb)
+    return run_local(code, expected, timeout, mem_mb, no_network)
+
+
+def run_local(code: str, expected: dict | None = None, timeout: float = 5.0, mem_mb: int = 2048,
+              no_network: bool = True) -> ExecResult:
+    """Exécution dans un sous-processus de cette machine (analyse AST comprise). Utilisée par le service."""
     import time
 
     from serving.sandbox.ast_check import check_code
@@ -91,6 +107,20 @@ def run_code(code: str, expected: dict | None = None, timeout: float = 5.0, mem_
     status = "timeout" if proc.returncode in (-signal.SIGXCPU, -signal.SIGKILL) else "error"
     return ExecResult(status, error=(err or out)[-500:] or f"exit {proc.returncode}", elapsed_ms=elapsed,
                       correct=False if expected else None)
+
+
+def _run_remote(url: str, code: str, expected: dict | None, timeout: float, mem_mb: int) -> ExecResult:
+    import httpx
+
+    try:
+        r = httpx.post(f"{url.rstrip('/')}/run", json={"code": code, "expected": expected, "timeout": timeout,
+                                                       "mem_mb": mem_mb},
+                       headers={"X-Sandbox-Token": os.getenv("SANDBOX_TOKEN", "")}, timeout=timeout + 15)
+        r.raise_for_status()
+        return ExecResult(**r.json())
+    except Exception as e:  # noqa: BLE001  (service injoignable : échec propre, jamais d'exécution locale)
+        return ExecResult("error", error=f"bac à sable injoignable : {type(e).__name__}",
+                          correct=False if expected else None)
 
 
 def run_standalone(code: str, timeout: float = 5.0) -> tuple[bool, str]:

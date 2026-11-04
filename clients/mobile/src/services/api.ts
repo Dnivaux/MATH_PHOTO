@@ -47,6 +47,8 @@ export interface Problem {
   type: ProblemType;
   variables: string[];
   route: 'local' | 'server';
+  /** server_ocr : la photo envoyée a été relue par le serveur (TexTeller), c'est cette lecture qui est résolue */
+  latex_source?: 'client' | 'server_ocr';
 }
 export interface ApiResult {
   latex: string;
@@ -190,15 +192,36 @@ export function latestModel(role: 'explainer' = 'explainer'): Promise<ModelManif
   return call<ModelManifest>('GET', `/v1/models/android/latest?role=${role}`, undefined, 10000);
 }
 
+export interface OcrResponse {
+  request_id: string;
+  latex: string;
+  model: string;
+  ms: number;
+}
+
+/** Relecture de la photo par le serveur (TexTeller), quand la lecture du téléphone est douteuse */
+export function ocrOnServer(imageBase64: string, signal?: AbortSignal): Promise<OcrResponse> {
+  return call<OcrResponse>(
+    'POST',
+    '/v1/ocr',
+    { image_base64: imageBase64, client: { platform: 'android', app_version: APP_VERSION, mode: effectiveMode() } },
+    20000,
+    signal,
+  );
+}
+
 /** Message affiché pour un code d'erreur du serveur */
 export function errorMessage(code?: ErrorCode | string, fallback?: string): string {
+  // la gateway indique ce qu'elle a lu quand elle a relu la photo : « … (photo relue par le serveur : x=…) »
+  const reread = fallback?.match(/\(photo relue par le serveur : (.*)\)$/s)?.[1];
+  const seen = reread ? ` Le serveur a lu sur la photo : ${reread}` : '';
   switch (code) {
     case 'parse_error':
-      return 'Le serveur n’a pas compris la formule. Vérifie-la et corrige-la si besoin.';
+      return 'Le serveur n’a pas compris la formule. Vérifie-la et corrige-la si besoin.' + seen;
     case 'unsupported_type':
-      return 'Ce type de problème n’est pas encore pris en charge.';
+      return 'Ce type de problème n’est pas encore pris en charge.' + seen;
     case 'image_not_supported':
-      return 'Le serveur ne lit pas encore les photos : envoie la formule en LaTeX.';
+      return 'Le serveur n’a pas pu relire la photo : corrige la formule à la main.';
     case 'code_failed':
     case 'timeout':
       return 'Le serveur n’a pas réussi à résoudre ce problème.';

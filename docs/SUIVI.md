@@ -99,24 +99,73 @@ avec `network_mode: none` (phase 5).
 
 ---
 
+## Session du 4 novembre (suite, après la fusion de `app-mobile`)
+
+| Sujet | État | Détail |
+|---|---|---|
+| Champion de l'explicateur | ✅ | `explainer-0.6b-gguf` v1 (non prunée) promue ; `EXPLAINER_REGISTRY` dans `.env`. `/v1/models` distribue `7b5772d7…` |
+| Renommage de l'app | ✅ | `PhotomathClone` → `PhotoMaths`, paquet `com.photomaths`, nom affiché « Photo → Maths ». APK compilé en local (121 Mo, `aapt` vérifié), 95 tests Jest |
+| CI de l'APK | ✅ écrite | `.github/workflows/apk.yml` : à la main ou sur un tag `v*` (release GitHub). Signé avec la clé de debug |
+| Bac à sable en conteneur dédié | ✅ | Service `sandbox` : réseau interne seulement (Internet, Postgres, MLflow injoignables, vérifié), lecture seule, `cap_drop: ALL`, `pids_limit`, 3 Go. AST refaite côté gateway |
+| Monitoring | ✅ | `GET /metrics`, Prometheus :9090, Grafana :3000 provisionné : trafic, latence p95 par étape, raisons d'escalade, usage par utilisateur (SQL), coût GPU estimé, vLLM. 12 panneaux vérifiés par l'API |
+| Compose | ✅ | Une gateway par profil (`gateway` / `gateway-ci`) : le profil `ci` ne relance plus vLLM |
+| Baselines OCR (synthétique, 300 images) | ✅ | Voir ci-dessous |
+
+### OCR : comparaison de modèles (étape 9, images synthétiques « façon photo », 300 images)
+
+Même mise en forme canonique pour tous (`serving/ocr/text.py`). Runs du 4 novembre, après correction :
+
+| Modèle | Équivalence | Limites | Erreur par token | p50 | Run |
+|---|---|---|---|---|---|
+| pix2tex (dans l'app) | 17,3 % | 22,7 % | 188 % | 350 ms (CPU) | `db7d5eff` |
+| PP-FormulaNet+-S | 21,7 % | 27,3 % | 222 % | 211 ms (CPU) | `e340dcf0` |
+| PP-FormulaNet-S | 29,0 % | 37,9 % | — | 190 ms (CPU) | `7aebb472` |
+| **pix2text-mfr** | **95,7 %** | 98,5 % | 4,9 % | 197 ms (CPU) | `c67f7b53` |
+| **pix2text-mfr 1.5** | 89,7 % | **100 %** | 6,3 % | 224 ms (CPU) | `c3477b77` |
+| TexTeller (serveur) | 89,3 % | 92,4 % | 32 % | 155 ms (GPU) | `8c2c2bb1` |
+
+Vote des deux pix2text-mfr : accord sur 262 images sur 300, dont 261 justes ; limites : 65 accords sur 66, tous justes.
+Décision : pix2text-mfr v1 + 1.5 sur le téléphone, désaccord → TexTeller (serveur) ou choix de l'utilisateur.
+
+Bugs du banc corrigés : délimiteurs `\[ \]` de TexTeller ; écritures équivalentes (`\operatorname*{l i m}`,
+`\underset{…}{\lim}`, `\mathrm{s i n}`, `\boxed{…}`, tableau d'une case, `=` parasite en tête) comptées comme fausses.
+Tous les runs d'avant sont tagués `invalid`. Tests : `tests/test_ocr_bench.py`.
+
+Limite : 3 familles de limites seulement dans le banc ; vraies photos pas encore prises.
+
+---
+
+## Premier test sur téléphone (S24 Ultra, 4 novembre)
+
+| Constat | Correction |
+|---|---|
+| L'aperçu caméra continue de bouger pendant la lecture | La photo prise reste affichée (caméra en pause) tant que la formule lue est à l'écran ; le déclencheur relance l'aperçu |
+| Formule quadratique lue en charabia par pix2tex (`\begin{array}… \hat{U}…`), le serveur ne reçoit que ce LaTeX | **OCR serveur** : service `ocr` (TexTeller, CPU, ~0,7 s), branché dans la gateway (`OCR_URL`). Quand l'app escalade pour `ocr_low_confidence`, `invalid_latex` ou `user_request`, elle envoie aussi la zone recadrée ; la gateway essaie d'abord la relecture serveur, puis la lecture du client. `problem.latex_source = server_ocr` dans la réponse |
+| | Test : LaTeX dégénéré + photo de `-3x²+23x-30=0` → relu, résolu et vérifié en 1,9 s. La photo de la capture est relue `x= \frac{-b \pm \sqrt{b^{2}-4ac}}{2a}` (hors périmètre : paramètres a, b, c), et l'app affiche maintenant ce que le serveur a lu |
+
+| Plantage au clic sur « Résoudre » (S24 Ultra, Snapdragon 8 Gen 3) : `UnsatisfiedLinkError: libcdsprpc.so` | `llama.rn` charge sa variante Hexagon / OpenCL sur Snapdragon 8 Gen 1+, qui exige `<uses-native-library>` pour `libcdsprpc.so` et `libOpenCL.so` dans le manifeste (`required="false"`). Invisible sur un téléphone sans Snapdragon |
+
+| pix2tex affiche du charabia (`\mathfrak{c}_{*}…`) : incompréhensible pour un utilisateur | **Relecture serveur dès le scan** : `POST /v1/ocr` (TexTeller). Si la lecture du téléphone est douteuse (confiance < seuil, `looksGarbled`, ou formule illisible pour CortexJS), la carte affiche « le serveur relit la photo… » puis la formule de TexTeller, marquée « Lue par le serveur ». Hors connexion, une lecture absurde n'est jamais montrée : « Formule illisible », avec « Saisir la formule » / « Reprendre ». `looksGarbled` testé sur les vraies sorties des essais |
+
+La photo ne quitte le téléphone que dans ces cas d'escalade, et n'est gardée qu'en mémoire.
+
+---
+
 ## Suite
 
 Relancer : `make up` (tout), ou `make infra-up` seul pour entraîner. Gateway sur :8100, jeton `dev-token`.
 
 ### Priorité 1
-1. Décider du champion de l'explicateur (proposition : la non prunée) :
-   ```bash
-   .venv/bin/python -c "from mlflow import MlflowClient; import mlflow; mlflow.set_tracking_uri('http://localhost:5000'); MlflowClient().set_registered_model_alias('explainer-0.6b-gguf', 'champion', '1')"
-   # puis EXPLAINER_REGISTRY=explainer-0.6b-gguf dans .env et `make up` : téléphones et mode léger suivent
-   ```
-2. Fusionner `app-mobile`, renommer `PhotomathClone`, pointer l'app sur la gateway du PC, tester avec une vraie photo.
-3. Mesures sur le téléphone (`eval/device_bench.py`) : prunée et non prunée, Q4_K_M et Q8_0.
-4. Étape 9, OCR : planche de 50 photos, `eval/ocr_bench.py`, calibration du seuil de confiance (0,9 laisse passer des lectures fausses).
+1. Pointer l'app sur la gateway du PC (`make up`, puis `http://<ip-du-PC>:8100` dans Réglages) et tester avec une vraie photo.
+2. Mesures sur le téléphone (`eval/device_bench.py`) : non prunée (champion) et prunée, Q4_K_M et Q8_0.
+3. Photos de la planche (`data/ocr/real/planche_a_imprimer.pdf`, 50 formules) → `eval/ocr_bench.py` sur `data/ocr/real`,
+   calibration du seuil de confiance (0,9 laisse passer des lectures fausses).
+4. OCR : pix2text-mfr v1 + 1.5 dans l'app (export INT8, décodeur TrOCR dans `ocrSource.ts`, même mise en forme
+   que `serving/ocr/text.py` côté TypeScript, vote). Élargir le générateur de limites (suites, x→0⁺, ln, exp, racines).
 
 ### Priorité 2 (grille MLOps)
-- Déploiement automatique sur une VM (runner auto-hébergé + `make up`), puis Terraform `libvirt`.
-- Bac à sable dans un conteneur dédié sans réseau.
-- Grafana sur la table `usage`, Prometheus `/metrics`, test de charge Locust, drift (Evidently).
+- Déploiement automatique sur une VM (runner auto-hébergé + `make up`), puis Terraform `libvirt` (demande sudo, IOMMU).
+- Test de charge Locust, drift (Evidently), DCGM exporter pour le GPU dans Grafana.
 
 ### Priorité 3
 - OCR phase 3A, jeu d'évaluation v2 plus dur, décodage spéculatif (8.5), pruning du vocabulaire, AWQ / FP8.

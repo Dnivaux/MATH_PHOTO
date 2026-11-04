@@ -1,0 +1,490 @@
+{
+ "uid": "photo-maths",
+ "title": "Photo → Maths : gateway, usage, coûts",
+ "schemaVersion": 41,
+ "version": 1,
+ "time": {
+  "from": "now-6h",
+  "to": "now"
+ },
+ "refresh": "30s",
+ "tags": [
+  "photo-maths"
+ ],
+ "panels": [
+  {
+   "id": 1,
+   "type": "row",
+   "title": "Trafic et qualité",
+   "collapsed": false,
+   "gridPos": {
+    "x": 0,
+    "y": 0,
+    "w": 24,
+    "h": 1
+   },
+   "panels": []
+  },
+  {
+   "id": 2,
+   "title": "Requêtes par seconde, par statut",
+   "type": "timeseries",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prom"
+   },
+   "gridPos": {
+    "x": 0,
+    "y": 1,
+    "w": 12,
+    "h": 8
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prom"
+     },
+     "refId": "A",
+     "expr": "sum by (endpoint, status) (rate(gateway_requests_total[$__rate_interval]))",
+     "legendFormat": "{{endpoint}} {{status}}",
+     "instant": false,
+     "range": true
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "reqps"
+    },
+    "overrides": []
+   },
+   "options": {}
+  },
+  {
+   "id": 3,
+   "title": "Latence p95 par étape (/v1/solve)",
+   "type": "timeseries",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prom"
+   },
+   "gridPos": {
+    "x": 12,
+    "y": 1,
+    "w": 12,
+    "h": 8
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prom"
+     },
+     "refId": "A",
+     "expr": "histogram_quantile(0.95, sum by (le, stage) (rate(gateway_stage_seconds_bucket{endpoint=\"solve\"}[$__rate_interval])))",
+     "legendFormat": "{{stage}}",
+     "instant": false,
+     "range": true
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "s"
+    },
+    "overrides": []
+   },
+   "options": {}
+  },
+  {
+   "id": 4,
+   "title": "Raisons d'escalade (période)",
+   "type": "piechart",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prom"
+   },
+   "gridPos": {
+    "x": 0,
+    "y": 9,
+    "w": 8,
+    "h": 8
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prom"
+     },
+     "refId": "A",
+     "expr": "sum by (escalation_reason) (increase(gateway_requests_total{endpoint=\"solve\"}[$__range]))",
+     "legendFormat": "{{escalation_reason}}",
+     "instant": true,
+     "range": false
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {},
+    "overrides": []
+   },
+   "options": {},
+   "description": "Pourquoi les clients envoient au serveur : contrat v1, champ escalation.reason"
+  },
+  {
+   "id": 5,
+   "title": "Résultats non vérifiés ou en erreur",
+   "type": "stat",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prom"
+   },
+   "gridPos": {
+    "x": 8,
+    "y": 9,
+    "w": 8,
+    "h": 8
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prom"
+     },
+     "refId": "A",
+     "expr": "(sum(increase(gateway_requests_total{endpoint=\"solve\",status!=\"ok\"}[$__range])) or vector(0)) / clamp_min(sum(increase(gateway_requests_total{endpoint=\"solve\"}[$__range])), 1)",
+     "legendFormat": "",
+     "instant": true,
+     "range": false
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "percentunit"
+    },
+    "overrides": []
+   },
+   "options": {},
+   "description": "unverified : le code et SymPy divergent ; error : LaTeX illisible, LLM ou bac à sable injoignable"
+  },
+  {
+   "id": 6,
+   "title": "Tentatives par résolution (auto-correction)",
+   "type": "bargauge",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prom"
+   },
+   "gridPos": {
+    "x": 16,
+    "y": 9,
+    "w": 8,
+    "h": 8
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prom"
+     },
+     "refId": "A",
+     "expr": "sum by (le) (increase(gateway_solve_attempts_bucket[$__range]))",
+     "legendFormat": "≤ {{le}}",
+     "instant": true,
+     "range": false
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {},
+    "overrides": []
+   },
+   "options": {
+    "displayMode": "basic",
+    "orientation": "horizontal"
+   }
+  },
+  {
+   "id": 7,
+   "type": "row",
+   "title": "Usage par utilisateur et coûts",
+   "collapsed": false,
+   "gridPos": {
+    "x": 0,
+    "y": 17,
+    "w": 24,
+    "h": 1
+   },
+   "panels": []
+  },
+  {
+   "id": 8,
+   "title": "Usage par utilisateur (table usage, Postgres)",
+   "type": "table",
+   "datasource": {
+    "type": "grafana-postgresql-datasource",
+    "uid": "pg"
+   },
+   "gridPos": {
+    "x": 0,
+    "y": 18,
+    "w": 16,
+    "h": 9
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "grafana-postgresql-datasource",
+      "uid": "pg"
+     },
+     "refId": "A",
+     "rawSql": "SELECT \"user\" AS utilisateur,\n  count(*) AS requetes,\n  count(*) FILTER (WHERE endpoint = 'solve') AS resolutions,\n  count(*) FILTER (WHERE endpoint = 'explain') AS explications_serveur,\n  count(*) FILTER (WHERE status <> 'ok') AS echecs,\n  round(sum(coalesce(llm_ms, 0))::numeric / 1000, 1) AS temps_llm_s,\n  round(percentile_cont(0.95) WITHIN GROUP (ORDER BY total_ms)::numeric) AS p95_ms,\n  string_agg(DISTINCT platform, ', ') AS clients\nFROM usage WHERE $__timeFilter(ts) GROUP BY \"user\" ORDER BY requetes DESC",
+     "format": "table",
+     "editorMode": "code",
+     "rawQuery": true
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {},
+    "overrides": []
+   },
+   "options": {}
+  },
+  {
+   "id": 9,
+   "title": "Coût GPU estimé (équivalent cloud)",
+   "type": "stat",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prom"
+   },
+   "gridPos": {
+    "x": 16,
+    "y": 18,
+    "w": 8,
+    "h": 9
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prom"
+     },
+     "refId": "A",
+     "expr": "sum by (user) (increase(gateway_llm_seconds_total[$__range])) / 3600 * $gpu_eur_h",
+     "legendFormat": "{{user}}",
+     "instant": true,
+     "range": false
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "currencyEUR"
+    },
+    "overrides": []
+   },
+   "options": {},
+   "description": "Temps passé dans les LLM × prix horaire d'un GPU loué (variable gpu_eur_h). Les cas résolus sur le téléphone ne coûtent rien : c'est l'économie de l'architecture hybride."
+  },
+  {
+   "id": 10,
+   "title": "Requêtes par client et par type de problème",
+   "type": "barchart",
+   "datasource": {
+    "type": "grafana-postgresql-datasource",
+    "uid": "pg"
+   },
+   "gridPos": {
+    "x": 0,
+    "y": 27,
+    "w": 12,
+    "h": 8
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "grafana-postgresql-datasource",
+      "uid": "pg"
+     },
+     "refId": "A",
+     "rawSql": "SELECT coalesce(problem_type, 'erreur') AS type,\n  count(*) FILTER (WHERE platform = 'android') AS android,\n  count(*) FILTER (WHERE platform = 'desktop') AS ordinateur,\n  count(*) FILTER (WHERE platform NOT IN ('android', 'desktop') OR platform IS NULL) AS autre\nFROM usage WHERE endpoint = 'solve' AND $__timeFilter(ts) GROUP BY 1 ORDER BY 1",
+     "format": "table",
+     "editorMode": "code",
+     "rawQuery": true
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {},
+    "overrides": []
+   },
+   "options": {
+    "stacking": "normal",
+    "xField": "type"
+   }
+  },
+  {
+   "id": 11,
+   "title": "Temps LLM par utilisateur",
+   "type": "timeseries",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prom"
+   },
+   "gridPos": {
+    "x": 12,
+    "y": 27,
+    "w": 12,
+    "h": 8
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prom"
+     },
+     "refId": "A",
+     "expr": "sum by (user) (rate(gateway_llm_seconds_total[$__rate_interval]))",
+     "legendFormat": "{{user}}",
+     "instant": false,
+     "range": true
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "s"
+    },
+    "overrides": []
+   },
+   "options": {},
+   "description": "Secondes de LLM par seconde : proxy de l'occupation GPU"
+  },
+  {
+   "id": 12,
+   "type": "row",
+   "title": "Modèles servis",
+   "collapsed": false,
+   "gridPos": {
+    "x": 0,
+    "y": 35,
+    "w": 24,
+    "h": 1
+   },
+   "panels": []
+  },
+  {
+   "id": 13,
+   "title": "vLLM : tokens générés par seconde",
+   "type": "timeseries",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prom"
+   },
+   "gridPos": {
+    "x": 0,
+    "y": 36,
+    "w": 8,
+    "h": 8
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prom"
+     },
+     "refId": "A",
+     "expr": "sum(rate(vllm:generation_tokens_total[$__rate_interval]))",
+     "legendFormat": "teacher-ft",
+     "instant": false,
+     "range": true
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "short"
+    },
+    "overrides": []
+   },
+   "options": {}
+  },
+  {
+   "id": 14,
+   "title": "vLLM : occupation du cache KV",
+   "type": "timeseries",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prom"
+   },
+   "gridPos": {
+    "x": 8,
+    "y": 36,
+    "w": 8,
+    "h": 8
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prom"
+     },
+     "refId": "A",
+     "expr": "max(vllm:kv_cache_usage_perc) or max(vllm:gpu_cache_usage_perc)",
+     "legendFormat": "cache KV",
+     "instant": false,
+     "range": true
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "percentunit"
+    },
+    "overrides": []
+   },
+   "options": {}
+  },
+  {
+   "id": 15,
+   "title": "Explications serveur : fidélité",
+   "type": "histogram",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prom"
+   },
+   "gridPos": {
+    "x": 16,
+    "y": 36,
+    "w": 8,
+    "h": 8
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prom"
+     },
+     "refId": "A",
+     "expr": "sum by (le) (increase(gateway_explain_faithfulness_bucket[$__range]))",
+     "legendFormat": "{{le}}",
+     "instant": true,
+     "range": false
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {},
+    "overrides": []
+   },
+   "options": {},
+   "description": "Part des égalités vérifiées par SymPy dans les explications du mode léger"
+  }
+ ],
+ "templating": {
+  "list": [
+   {
+    "name": "gpu_eur_h",
+    "label": "Prix GPU (€/h)",
+    "type": "textbox",
+    "query": "0.8",
+    "current": {
+     "text": "0.8",
+     "value": "0.8"
+    }
+   }
+  ]
+ }
+}

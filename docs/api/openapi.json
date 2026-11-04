@@ -229,6 +229,50 @@
     }
    }
   },
+  "/v1/ocr": {
+   "post": {
+    "summary": "Ocr",
+    "operationId": "ocr_v1_ocr_post",
+    "parameters": [
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/v1/explain": {
    "post": {
     "summary": "Explain",
@@ -659,6 +703,16 @@
       ],
       "title": "Route",
       "description": "Où ce type de problème est censé être traité"
+     },
+     "latex_source": {
+      "type": "string",
+      "enum": [
+       "client",
+       "server_ocr"
+      ],
+      "title": "Latex Source",
+      "description": "server_ocr : la photo envoyée a été relue par le serveur, et c'est cette lecture qui a été résolue",
+      "default": "client"
      }
     },
     "type": "object",
@@ -732,14 +786,15 @@
      "image_base64": {
       "anyOf": [
        {
-        "type": "string"
+        "type": "string",
+        "maxLength": 11000000
        },
        {
         "type": "null"
        }
       ],
       "title": "Image Base64",
-      "description": "JPEG/PNG en base64 (OCR serveur)"
+      "description": "JPEG/PNG en base64, recadré sur la formule (8 Mo max). Relu par l'OCR serveur quand il n'y a pas de LaTeX, ou quand le client escalade pour ocr_low_confidence, invalid_latex ou user_request"
      },
      "type_hint": {
       "anyOf": [

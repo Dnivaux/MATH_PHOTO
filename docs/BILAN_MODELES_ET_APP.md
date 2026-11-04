@@ -18,17 +18,18 @@ Document de préparation de la soutenance. Toutes les valeurs viennent des runs 
 | `math-7b-teacher` | Qwen2.5-Math-7B-Instruct | QLoRA r=16 (problème → code SymPy) | 100 % juste, **1,4 s au lieu de 3,5 s**, 82 tokens au lieu de 314 | champion |
 | `math-1.5b-distill` | Qwen2.5-Math-1.5B-Instruct | Distillation par séquence depuis `teacher-ft` | 100 % juste, **0,43 s** (8 fois plus rapide que le 7B brut) | champion |
 | `explainer-0.6b` | Qwen3-0.6B | Distillation d'explications françaises vérifiées (3 niveaux) | Acceptation au lycée **84 % → 97,2 %** | champion |
-| `explainer-0.6b-gguf` | `explainer-0.6b` | GGUF Q4_K_M avec matrice d'importance | 378 Mo, 92 tok/s sur CPU | challenger |
-| `explainer-0.6b-p20-gguf` | `explainer-0.6b` | Pruning 20 % des couches + LoRA de réparation + GGUF Q4_K_M | **324 Mo, 109 tok/s**, 95,2 % au lycée | **champion (livré au téléphone)** |
+| `explainer-0.6b-gguf` | `explainer-0.6b` | GGUF Q4_K_M avec matrice d'importance | 378 Mo, 92 tok/s sur CPU, ≥ 94,4 % aux 3 niveaux | **champion (distribué au téléphone depuis le 4 nov.)** |
+| `explainer-0.6b-p20-gguf` | `explainer-0.6b` | Pruning 20 % des couches + LoRA de réparation + GGUF Q4_K_M | 324 Mo, 109 tok/s, mais 82 % au collège | ancien champion (4 oct.) |
 
 - **Chaîne de compression complète sur l'explicateur** : 1 148 Mo (bf16) → 324 Mo (÷ 3,5), avec 2 points
   d'acceptation perdus au lycée par rapport au modèle distillé (97,2 → 95,2 %), et un modèle encore meilleur que la baseline brute.
 - **App Android fonctionnelle** (collègue) : photo → OCR embarqué → calcul exact local ou escalade → explication
   rédigée sur le téléphone par notre modèle prunée Q4 → graphe interactif. Branche pas encore fusionnée.
-- **Décision à revoir** : réévaluée sur les trois niveaux à la température réelle, la version prunée tombe à
-  82 % au collège, contre 94,8 % pour la non prunée (section 4.5).
-- **Point faible** : l'OCR. pix2tex brut, non fine-tuné, lit mal les vraies photos. La phase 3A (fine-tuning,
-  distillation TexTeller, quantization comparée) n'a pas commencé.
+- **Décision corrigée** : réévaluée sur les trois niveaux à la température réelle, la version prunée tombe à
+  82 % au collège, contre 94,8 % pour la non prunée. La non prunée a été promue le 4 novembre (section 4.5).
+- **OCR : pix2tex remplacé par pix2text-mfr.** Sur 300 images synthétiques « façon photo », pix2tex (dans l'app)
+  ne lit juste que 17 % des formules. pix2text-mfr (MIT, ONNX, même moteur que l'app) en lit 95,7 %, sa version 1.5
+  100 % des limites, sur CPU en ~0,2 s. Quand les deux lisent la même formule (87 % des cas), elle est juste 261 fois sur 262.
 
 ---
 
@@ -211,7 +212,9 @@ téléphone et de la gateway), les deux versions ne se valent plus :
 Le pruning et la quantization se cumulent au collège : − 12,8 points. Le choix initial reposait sur un seul
 niveau, où l'écart était dans le bruit de mesure (± 2 points entre deux runs identiques). **Leçon pour la
 soutenance** : une règle de promotion doit porter sur le pire cas (le minimum sur les niveaux), et l'évaluation
-doit se faire dans les conditions réelles d'inférence. Proposition : promouvoir la non prunée (+ 54 Mo).
+doit se faire dans les conditions réelles d'inférence. **La non prunée a été promue** (`champion`, + 54 Mo) : il
+a suffi de déplacer l'alias dans le registry, et la gateway la distribue aux téléphones sans nouvelle version de
+l'app.
 
 ### 4.6 Courbe à montrer en soutenance (explicateur, lycée)
 
@@ -236,6 +239,34 @@ pruné Q4_K_M          324 Mo        95,2 %   ← quantization : ÷ 3 en taille,
 | CUDA sur Arch | `nvcc` introuvable pour FlashInfer et llama.cpp | Chemins CUDA ajoutés dans les scripts |
 
 ---
+
+### 4.8 OCR : quel modèle sur le téléphone ? (phase 2, étape 9)
+
+300 images synthétiques (formules rendues en plusieurs polices, puis perspective, flou, bruit, ombres), même mise en
+forme canonique pour tous les modèles (`serving/ocr/text.py`, aussi utilisée par le service OCR du serveur) :
+
+| Modèle | Licence | Rôle | Équivalence | Équations | Dérivées | Intégrales | Limites | p50 |
+|---|---|---|---|---|---|---|---|---|
+| pix2tex, 25 M | MIT | dans l'app aujourd'hui | 17,3 % | 26,0 % | 3,8 % | 18,3 % | 22,7 % | 350 ms (CPU) |
+| PP-FormulaNet+-S | Apache-2.0 | candidat | 21,7 % | 26,0 % | 21,5 % | 13,4 % | 27,3 % | 211 ms (CPU) |
+| PP-FormulaNet-S | Apache-2.0 | candidat | 29,0 % | 38,4 % | 22,8 % | 19,5 % | 37,9 % | 190 ms (CPU) |
+| **pix2text-mfr** | MIT | **téléphone** | **95,7 %** | 100 % | 97,5 % | 87,8 % | 98,5 % | 197 ms (CPU, ONNX 4 fils) |
+| **pix2text-mfr 1.5** | MIT | **téléphone** | 89,7 % | 98,6 % | 89,9 % | 73,2 % | **100 %** | 224 ms (CPU, ONNX 4 fils) |
+| TexTeller | Apache-2.0 | serveur | 89,3 % | 94,5 % | 83,5 % | 87,8 % | 92,4 % | 155 ms (GPU) |
+
+Écartés sans mesure : Texo (licence AGPL, incompatible avec l'app), UniMERNet-tiny (441 Mo).
+
+**Vote à deux lecteurs.** Les deux pix2text-mfr lisent la même formule sur 262 images sur 300, et elle est alors
+juste 261 fois. Sur les limites : accord 65 fois sur 66, toujours juste. En cas de désaccord, l'app demande au
+serveur (TexTeller) ou à l'utilisateur. Au moins l'un des deux a raison sur 295 images sur 300.
+
+**Ce que le banc a appris.** Les modèles écrivent la même formule de façons différentes : `\operatorname*{l i m}`,
+`\underset{x\to 0}{\lim}`, `\mathrm{s i n}` (pix2text-mfr), formule encadrée par `\boxed{…}` ou un tableau d'une
+case (TexTeller). Sans mise en forme commune, pix2text-mfr était à 0 % sur les limites et TexTeller à 70 % : on
+aurait écarté le meilleur modèle pour une question d'écriture. Les runs d'avant sont tagués `invalid`.
+
+**Limites du banc.** Les 66 limites ne couvrent que trois familles (fraction rationnelle en x→∞ et en x→a,
+sin(kx)/x). Suites, limites à droite, ln, exp, racines restent à ajouter, et les vraies photos à prendre.
 
 ## 5. Hygiène MLflow
 
@@ -305,8 +336,8 @@ La seconde version s'aligne sur le dossier : pas de Python sur le téléphone, e
   l'ordinateur, endpoint `GET /v1/models/android/latest` (l'app l'appelle déjà, la gateway ne l'a pas).
 - **Pas de mesure sur le téléphone** dans la branche (RAM, tok/s, latence de l'OCR) : indispensable pour le
   niveau 2 du sujet embarqué.
-- Le paquet Android et le projet s'appellent `PhotomathClone` / `com.photomathclone` : à renommer avant la
-  soutenance (marque déposée, et le projet se présente comme une alternative, pas une copie).
+- ~~Nom `PhotomathClone`~~ : renommé le 4 novembre en `PhotoMaths` (`com.photomaths`, « Photo → Maths »), APK
+  recompilé et vérifié.
 
 ---
 
@@ -317,15 +348,15 @@ La seconde version s'aligne sur le dossier : pas de Python sur le téléphone, e
 | MLOps 0 | `docker compose up` lance tout | 🟢 Fait | `make up` : infra, vLLM (7B + LoRA du registry), explicateur GGUF, gateway. `make up-ci` sans GPU |
 | MLOps 1 | Déploiement auto sur une VM | 🔴 À faire | CI écrite (`.github/workflows/ci.yml`) ; ni VM ni CD |
 | MLOps 1 | Token dans le header | 🟢 Fait | `Authorization: Bearer`, clés par utilisateur et par appareil stockées hachées, révocables |
-| MLOps 1 | Suivi d'usage par utilisateur | 🟡 Bien avancé | Table `usage` (client, type, raison d'escalade, statut, temps LLM), `GET /admin/usage` ; Grafana à faire |
+| MLOps 1 | Suivi d'usage par utilisateur | 🟢 Fait | Table `usage`, `GET /admin/usage`, tableau de bord Grafana provisionné (usage par utilisateur, coût GPU estimé) |
 | MLOps 2 | Terraform | 🔴 À faire | |
 | MLOps 2 | Test de charge | 🔴 À faire | |
 | MLOps 2 | Interface utilisateur | 🟢 Fait | App Android du collègue |
-| MLOps 2 | Data drift | 🔴 À faire | |
+| MLOps 2 | Data drift | 🔴 À faire | Prometheus et Grafana en place (`/metrics`) : base du monitoring |
 | MLOps 2 | MLflow pour versionner et mettre en prod | 🟢 Fait | Tracking, registry, alias, lignée. La stack sert les `champion` du registry, et `GET /v1/models` les distribue aux téléphones avec leur SHA-256 |
 | MLOps 3 | Quantization | 🟢 Fait (LLM) | GGUF F16 / Q8_0 / Q4_K_M avec imatrix. AWQ / FP8 du 7B serveur : à faire |
 | MLOps 3 | Canary, scaling, Kubernetes | 🔴 À faire | |
-| MLOps 3 | Prompt injection | 🟡 Partiel | Bac à sable (AST, liste blanche, rlimits, 9 tests d'attaque) ; réseau coupé hors conteneur seulement ; pas de Prompt Guard / Llama Guard |
+| MLOps 3 | Prompt injection | 🟡 Partiel | Bac à sable dans un conteneur dédié (réseau interne seul, lecture seule, sans capability) + AST, liste blanche, rlimits, 9 tests d'attaque ; pas de Prompt Guard / Llama Guard |
 | MLOps 3 | Améliorations libres | 🟢 Fait en partie | Distillation, pruning, vérification déterministe des résultats |
 | Embarqué 1 | Packager un modèle | 🟢 Fait | OCR ONNX et LLM GGUF dans l'app Android |
 | Embarqué 2 | Quantizations comparées + meilleure déployée | 🟡 Partiel | Fait pour le LLM (sur CPU du PC, pas encore sur le téléphone). OCR : seulement INT8 dynamique, sans comparaison FP32 / FP16 / INT8 statique / QAT |
@@ -338,36 +369,33 @@ aujourd'hui des cibles `make`), versionnement DVC.
 
 ## 8. Reste à faire, par priorité
 
-**Fait le 4 novembre** : `GET /v1/models/{client}/latest`, hygiène MLflow, évals à la température réelle, stack
-complète en une commande servie depuis le registry, clés hachées et usage par utilisateur, CI GitHub Actions
-(vérifiée en local, y compris les 95 tests de l'app), outil de mesure sur téléphone vers MLflow.
+**Fait le 4 novembre** : `GET /v1/models/{client}/latest`, hygiène MLflow, évals à la température réelle et
+promotion de la non prunée, stack complète en une commande servie depuis le registry, clés hachées et usage
+par utilisateur, bac à sable en conteneur isolé, Prometheus et Grafana, CI GitHub Actions (tests et APK),
+fusion et renommage de l'app, baselines OCR sur images synthétiques, outil de mesure sur téléphone.
 
 ### Priorité 1 : avant la soutenance, pour une démo crédible
 
-1. **Choisir le champion de l'explicateur** (section 4.5 ; proposition : la non prunée).
-2. **Fusionner `app-mobile` dans `master`** (PR, relecture, renommage `PhotomathClone`).
-3. **Mesurer sur le téléphone** avec `eval/device_bench.py` : RAM en pic, tok/s, latences OCR et explication,
+1. **Test de bout en bout** : téléphone → `make up` sur le PC, avec une vraie photo.
+2. **Mesurer sur le téléphone** avec `eval/device_bench.py` : RAM en pic, tok/s, latences OCR et explication,
    prunée et non prunée, Q4_K_M et Q8_0 (sujet embarqué niveau 2).
-4. **Étape 9, OCR** : planche de 50 photos, `eval/ocr_bench.py` sur pix2tex et TexTeller, calibration du seuil de
+3. **Photos de la planche** (50 formules) : `eval/ocr_bench.py` sur photos réelles, calibration du seuil de
    confiance (courbe exactitude / taux d'escalade).
-5. **Test de bout en bout** : téléphone → `make up` sur le PC, avec une vraie photo.
+4. **OCR** : remplacer pix2tex par les deux pix2text-mfr dans l'app (export INT8, vote), élargir les limites
+   du banc (suites, x→0⁺, ln, exp, racines), puis comparaison FP32 / FP16 / INT8 dynamique / statique.
 
 ### Priorité 2 : points de la grille MLOps encore à zéro
 
-6. **Déploiement automatique sur une VM** (niveau 1) : runner GitHub auto-hébergé + `make up`, puis
+5. **Déploiement automatique sur une VM** (niveau 1) : runner GitHub auto-hébergé + `make up`, puis
    **Terraform `libvirt`** (niveau 2). Repli prévu au dossier : Docker sur l'hôte.
-7. **Bac à sable dans un conteneur dédié** sans réseau (phase 5).
-8. **Grafana** sur la table d'usage, **Prometheus** `/metrics`, **test de charge Locust**, **data drift** (Evidently).
+6. **Test de charge Locust**, **data drift** (Evidently), DCGM exporter (GPU) dans Grafana.
 
 ### Priorité 3 : compléter la chaîne d'optimisation
 
-9. **OCR, phase 3A** : fine-tuning de pix2tex sur les images synthétiques (301 générées, en faire plusieurs
-   milliers) puis sur photos, distillation depuis TexTeller, comparaison FP32 / FP16 / INT8 dynamique / INT8
-   statique. Le format ONNX du collègue est prêt à recevoir le nouveau modèle sans toucher à l'app.
-10. **Jeu d'évaluation v2** plus difficile (500 problèmes, avec les types locaux et des cas durs).
-11. **Décodage spéculatif** (7B + 1,5B distillé en brouillon, étape 8.5).
-12. Réparation plus longue du modèle pruné (le collège y perd le plus), puis pruning du vocabulaire du 0,6B.
-13. AWQ / FP8 du 7B pour le serveur.
+7. **Jeu d'évaluation v2** plus difficile (500 problèmes, avec les types locaux et des cas durs).
+8. **Décodage spéculatif** (7B + 1,5B distillé en brouillon, étape 8.5).
+9. Réparation plus longue du modèle pruné (le collège y perd le plus), puis pruning du vocabulaire du 0,6B.
+10. AWQ / FP8 du 7B pour le serveur.
 
 ### Priorité 4 : si le temps le permet
 

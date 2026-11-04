@@ -74,6 +74,8 @@ export interface OcrRawResult {
   preprocessMs: number;
   inferenceMs: number;
   model: string;
+  /** zone lue, recadrée, en JPEG base64 (relecture serveur si la lecture est incertaine) */
+  image?: string | null;
 }
 
 /** Zone à lire, en fractions de l'image (0..1) */

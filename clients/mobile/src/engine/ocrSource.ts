@@ -151,10 +151,12 @@ var OCR = (function () {
       x1.fillStyle = 'white'; x1.fillRect(0, 0, c1.width, c1.height);
       x1.imageSmoothingQuality = 'high';
       x1.drawImage(bmp, sx, sy, sw, sh, 0, 0, c1.width, c1.height);
+      // zone lue, en couleur : envoyée au serveur si la lecture est incertaine (relecture par TexTeller)
+      var jpeg = c1.toDataURL('image/jpeg', 0.9).replace(/^data:[^,]*,/, '');
       var W = c1.width, H = c1.height, img = x1.getImageData(0, 0, W, H), d = img.data, n = W * H;
       var g = new Float32Array(n);
       for (var i = 0; i < n; i++) g[i] = 0.299 * d[4 * i] + 0.587 * d[4 * i + 1] + 0.114 * d[4 * i + 2];
-      var gray = { w: W, h: H, d: g };
+      var gray = { w: W, h: H, d: g, jpeg: jpeg };
       if (!crop && bmp.width <= 800 && bmp.height <= 400) return gray;   // image déjà propre (capture, rendu)
 
       // fond estimé : image réduite au 1/16, dilatée (maximum 3x3, deux passes), puis floutée et agrandie
@@ -290,11 +292,14 @@ var OCR = (function () {
   }
 
   function recognize(p) {
-    var t0 = Date.now(), t1, t2;
+    var t0 = Date.now(), t1, t2, jpeg = null;
     return init().then(function () {
       t1 = Date.now();
       return loadGray(b64ToBlob(p.imageBase64, p.mime), p.crop);
-    }).then(prepare).then(function (img) {
+    }).then(function (gray) {
+      jpeg = gray.jpeg || null;
+      return prepare(gray);
+    }).then(function (img) {
       t2 = Date.now();
       return greedy(tensor(img)).then(function (r) {
         return {
@@ -304,6 +309,7 @@ var OCR = (function () {
           input: [img.w, img.h],
           waitMs: t1 - t0, preprocessMs: t2 - t1, inferenceMs: Date.now() - t2,
           model: cfg.name + ' ' + cfg.version,
+          image: jpeg,
         };
       });
     });

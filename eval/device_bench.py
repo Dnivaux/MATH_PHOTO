@@ -30,7 +30,7 @@ import mlflow
 
 from common import tracking
 
-PACKAGE = "com.photomathclone"
+PACKAGE = "com.photomaths"
 PSS_RE = re.compile(r"TOTAL(?: PSS)?:?\s+(\d+)")
 
 

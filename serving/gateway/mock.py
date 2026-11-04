@@ -15,7 +15,7 @@ import json
 import uuid
 from pathlib import Path
 
-from fastapi import Depends, FastAPI, Header
+from fastapi import Depends, FastAPI, Header, HTTPException
 
 from datagen.from_latex import detect_type
 from serving.gateway import models
@@ -58,6 +58,11 @@ async def solve(req: SolveRequest, x_mock_scenario: str = Header("ok")):
         resp.result.verified = False
         resp.error = ErrorInfo(code=ErrorCode.answer_mismatch, message="le code et SymPy divergent (scénario factice)")
     return resp
+
+
+@app.post("/v1/ocr", dependencies=[Depends(require_token)])
+def ocr():
+    raise HTTPException(503, "pas d'OCR serveur dans la gateway factice : l'app garde sa propre lecture")
 
 
 @app.post("/v1/explain", response_model=ExplainResponse, dependencies=[Depends(require_token)])
