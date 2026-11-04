@@ -18,6 +18,7 @@ from pathlib import Path
 from fastapi import Depends, FastAPI, Header
 
 from datagen.from_latex import detect_type
+from serving.gateway import models
 from serving.gateway.auth import require_token
 from serving.gateway.schema import (
     ErrorCode, ErrorInfo, ExplainRequest, ExplainResponse, Explanation, Health, SolveRequest, SolveResponse,
@@ -25,6 +26,7 @@ from serving.gateway.schema import (
 
 EXAMPLES = Path(__file__).with_name("examples")
 app = FastAPI(title="Photo → Maths gateway (factice)", version="1.0")
+app.include_router(models.router)
 
 
 def _example(name: str) -> dict:

@@ -37,8 +37,10 @@ def main() -> None:
         if not target.exists():
             target.hardlink_to(out / f"{args.name}-{args.register_quant}.gguf")
         (reg / "lineage.json").write_text(json.dumps({"parent": args.parent, "quant": args.register_quant}))
+        # hash et taille en tags : la gateway les annonce aux téléphones sans relire le fichier
         v = tracking.register_dir(str(reg), f"{args.name}-gguf", alias="challenger", parent=args.parent,
-                                  tags={"quant": args.register_quant})
+                                  tags={"quant": args.register_quant, "sha256": tracking.file_sha256(target),
+                                        "bytes": str(target.stat().st_size)})
         print(f"{args.name}-gguf v{v} enregistré")
 
 

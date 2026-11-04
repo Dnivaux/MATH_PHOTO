@@ -1,0 +1,12 @@
+.venv*
+.git
+third_party
+models
+data
+mlruns
+clients
+**/__pycache__
+*.egg-info
+*.gguf
+*.txt
+.env

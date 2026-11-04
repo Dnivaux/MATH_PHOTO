@@ -8,8 +8,14 @@ help:
 # ---- 1. Environnement
 infra-up: ## MLflow + Postgres + MinIO (http://localhost:5000, console MinIO :9001)
 	docker compose up -d --build
-infra-down: ## arrête l'infra (les volumes sont conservés)
-	docker compose down
+infra-down: ## arrête l'infra et la stack (les volumes sont conservés)
+	docker compose --profile gpu --profile ci down
+up: ## stack complète en une commande : infra + vLLM (champion du registry) + explicateur + gateway :8100
+	docker compose --profile gpu up -d --build
+up-ci: ## même stack sans GPU : faux LLM à la place des modèles
+	docker compose --profile ci up -d --build
+mlflow-hygiene: ## tague invalid les runs à écarter, range les alias (simulation ; APPLY=1 pour appliquer)
+	$(PY) scripts/mlflow_hygiene.py $(if $(APPLY),--apply)
 env: ## venv GPU : PyTorch Blackwell, vLLM, bitsandbytes, TRL
 	infra/setup/setup_env.sh
 llamacpp: ## llama.cpp avec CUDA sm_120 (après `sudo pacman -S cuda`)
@@ -49,4 +55,4 @@ eval-explain: ## make eval-explain NAME=baseline-qwen3-0.6b ROLE=baseline
 report: ## tableau de synthèse depuis MLflow
 	$(PY) -m eval.report
 
-.PHONY: help infra-up infra-down env llamacpp env-check test contract mock data-eval data-train eval-code eval-passk eval-explain report
+.PHONY: help infra-up infra-down up up-ci mlflow-hygiene env llamacpp env-check test contract mock data-eval data-train eval-code eval-passk eval-explain report

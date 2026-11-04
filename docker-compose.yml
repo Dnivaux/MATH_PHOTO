@@ -1,6 +1,11 @@
-# MLflow (tracking + registry) avec Postgres comme backend et MinIO comme stockage d'artefacts.
-# Lancement : docker compose up -d --build
-# UI MLflow : http://localhost:5000   Console MinIO : http://localhost:9001
+# Stack Photo → Maths (dossier, phase 4 : niveau 0 « lancement en une commande »).
+#
+#   docker compose up -d --build                  infra seule : MLflow + Postgres + MinIO (entraînement, évals)
+#   docker compose --profile gpu up -d --build    + vLLM (teacher-ft) + explicateur GGUF + gateway  (make up)
+#   docker compose --profile ci up -d --build     + faux LLM à la place des modèles, sans GPU      (make up-ci)
+#
+# Les modèles servis sont les `champion` du registry MLflow, téléchargés par `model-fetch` au démarrage.
+# UI MLflow : http://localhost:5000   Console MinIO : http://localhost:9001   Gateway : http://localhost:8100
 name: photo-maths
 
 services:
@@ -78,8 +83,153 @@ services:
       --allowed-hosts "localhost,localhost:*,127.0.0.1:*,mlflow:*"
     ports:
       - "5000:5000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/health')"]
+      interval: 5s
+      retries: 30
+    restart: unless-stopped
+
+  # ---- Service (profils gpu et ci)
+
+  model-fetch:
+    # Télécharge les `champion` du registry dans le volume `registry` (rien si la version est déjà là).
+    build: ./infra/mlflow
+    profiles: [gpu]
+    depends_on:
+      mlflow:
+        condition: service_healthy
+    environment:
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+    volumes:
+      - registry:/registry
+      - ./serving/fetch_models.py:/fetch_models.py:ro
+    command: ["python", "/fetch_models.py", "math-7b-teacher", "${EXPLAINER_REGISTRY:-explainer-0.6b-p20-gguf}"]
+
+  vllm:
+    # Qwen2.5-Math-7B + adaptateur QLoRA `teacher-ft` du registry (même version de vLLM que le venv).
+    image: vllm/vllm-openai:v0.30.0@sha256:8a69ffad015f138d7170c4ddc429e230a3bc1c1719f67e14324749df200a4b90
+    profiles: [gpu]
+    depends_on:
+      model-fetch:
+        condition: service_completed_successfully
+    command:
+      - Qwen/Qwen2.5-Math-7B-Instruct
+      - --served-model-name=qwen-math-7b
+      - --enable-lora
+      - --max-lora-rank=16
+      - --lora-modules
+      - teacher-ft=/registry/math-7b-teacher/model
+      - --max-model-len=4096
+      - --gpu-memory-utilization=${GPU_UTIL:-0.85}
+    environment:
+      HF_HUB_OFFLINE: "1"   # poids de base déjà dans le cache de l'hôte, monté en lecture seule
+    volumes:
+      - registry:/registry:ro
+      - ${HF_HOME:-~/.cache/huggingface}:/root/.cache/huggingface:ro
+    ipc: host
+    ports:
+      - "8000:8000"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8000/health"]
+      interval: 10s
+      start_period: 600s
+      retries: 6
+    restart: unless-stopped
+
+  explainer:
+    # Mode léger (POST /v1/explain) : l'explicateur champion en GGUF sur CPU, comme sur le téléphone.
+    image: ghcr.io/ggml-org/llama.cpp:server@sha256:ba68b6996ba6d27a49a9864452194128e118a1fcb96dd663f223a13e0a2857a8
+    profiles: [gpu]
+    depends_on:
+      model-fetch:
+        condition: service_completed_successfully
+    command: ["-m", "/registry/${EXPLAINER_REGISTRY:-explainer-0.6b-p20-gguf}/current.gguf", "--alias", "explainer", "--host", "0.0.0.0",
+              "--port", "8000", "--jinja", "-c", "4096", "-t", "${EXPLAIN_THREADS:-8}", "--parallel", "4"]
+    volumes:
+      - registry:/registry:ro
+    ports:
+      - "8090:8000"
+    healthcheck:  # celui de l'image vise le port 8080
+      test: ["CMD", "curl", "-sf", "http://localhost:8000/health"]
+      interval: 10s
+      retries: 6
+    restart: unless-stopped
+
+  fake-llm:
+    # Profil ci : oracle compatible OpenAI, joignable sous les noms `vllm` et `explainer`.
+    build: {context: ., dockerfile: serving/gateway/Dockerfile}
+    profiles: [ci]
+    command: ["uvicorn", "serving.llm.fake_llm:app", "--host", "0.0.0.0", "--port", "8000"]
+    volumes:
+      - ./data:/app/data:ro
+    networks:
+      default:
+        aliases: [vllm, explainer]
+
+  gateway-db:
+    # Base `gateway` (clés hachées, usage par utilisateur) dans le Postgres de MLflow, créée si absente.
+    image: postgres:16
+    profiles: [gpu, ci]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD:-mlflow}
+    command:
+      - sh
+      - -c
+      - >
+        psql -h postgres -U mlflow -tAc "SELECT 1 FROM pg_database WHERE datname='gateway'" | grep -q 1
+        || psql -h postgres -U mlflow -c "CREATE DATABASE gateway"
+
+  gateway:
+    build: {context: ., dockerfile: serving/gateway/Dockerfile}
+    profiles: [gpu, ci]
+    depends_on:
+      mlflow:
+        condition: service_healthy
+      gateway-db:
+        condition: service_completed_successfully
+      vllm:
+        condition: service_started
+        required: false
+      explainer:
+        condition: service_started
+        required: false
+      fake-llm:
+        condition: service_started
+        required: false
+    environment:
+      VLLM_BASE_URL: http://vllm:8000/v1
+      VLLM_MODEL: teacher-ft
+      EXPLAIN_BASE_URL: http://explainer:8000/v1
+      EXPLAIN_MODEL: explainer
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+      GATEWAY_TOKENS: ${GATEWAY_TOKENS:-dev-token}
+      # modèle d'explication distribué aux clients et servi en mode léger (le même)
+      MODEL_ROLES: '{"android/explainer": "${EXPLAINER_REGISTRY:-explainer-0.6b-p20-gguf}", "ios/explainer": "${EXPLAINER_REGISTRY:-explainer-0.6b-p20-gguf}", "desktop/explainer": "${EXPLAINER_REGISTRY:-explainer-0.6b-p20-gguf}"}'
+      GATEWAY_ADMIN_TOKEN: ${GATEWAY_ADMIN_TOKEN:-}
+      GATEWAY_DB_URL: postgresql+psycopg2://mlflow:${POSTGRES_PASSWORD:-mlflow}@postgres:5432/gateway
+    volumes:
+      - registry:/registry:ro
+      - modelcache:/cache
+    ports:
+      - "8100:8100"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8100/health')"]
+      interval: 10s
+      retries: 30
     restart: unless-stopped
 
 volumes:
   pgdata:
   miniodata:
+  registry:
+  modelcache:

@@ -1,0 +1,69 @@
+# CI (dossier, phase 8) : lint et tests Python, bac à sable compris ; image de la gateway ; app mobile.
+# Sans GPU : la gateway est testée avec la factice et le faux LLM, les modèles ne sont jamais chargés.
+name: ci
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+jobs:
+  python:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - name: Dépendances
+        run: |
+          uv venv --python 3.12 .venv
+          uv pip install --python .venv -e ".[dev]"
+      - name: ruff
+        run: .venv/bin/ruff check .
+      - name: pytest (bac à sable, générateur, fidélité, gateway, distribution des modèles)
+        run: .venv/bin/python -m pytest -q
+
+  gateway-image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build
+        run: docker build -f serving/gateway/Dockerfile -t photo-maths-gateway:ci .
+      - name: Test de fumée (gateway factice dans l'image)
+        run: |
+          docker run -d --name gw -p 8100:8100 photo-maths-gateway:ci \
+            uvicorn serving.gateway.mock:app --host 0.0.0.0 --port 8100
+          for i in $(seq 30); do curl -sf localhost:8100/health && break; sleep 1; done
+          test "$(curl -s -o /dev/null -w '%{http_code}' -X POST localhost:8100/v1/solve -H 'Content-Type: application/json' -d '{"latex":"x=1"}')" = 401
+          curl -sf -X POST localhost:8100/v1/solve -H 'Authorization: Bearer dev-token' \
+               -H 'Content-Type: application/json' -d '{"latex":"x^2-5x+6=0"}' | grep -q '"status"'
+      - if: failure()
+        run: docker logs gw
+
+  mobile:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: clients/mobile
+    steps:
+      - uses: actions/checkout@v4
+      - name: App présente ?
+        id: app
+        working-directory: .
+        run: test -f clients/mobile/package.json && echo "present=true" >> "$GITHUB_OUTPUT" || echo "app mobile absente"
+      - uses: actions/setup-node@v4
+        if: steps.app.outputs.present == 'true'
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: clients/mobile/package-lock.json
+      - if: steps.app.outputs.present == 'true'
+        run: npm ci
+      - name: TypeScript
+        if: steps.app.outputs.present == 'true'
+        run: npx tsc --noEmit -p .
+      - name: Jest (moteur CortexJS, fidélité, prompt, OCR)
+        if: steps.app.outputs.present == 'true'
+        run: npm test
+      - name: ESLint
+        if: steps.app.outputs.present == 'true'
+        run: npm run lint
