@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Banc moteur</title>
+<style>
+  :root { --bg: #F7F5F0; --text: #1B1D24; --muted: #555865; --ok: #1B7348; --bad: #BD241A; --line: #DCD7CB; }
+  body { margin: 0; padding: 16px; background: var(--bg); color: var(--text); font: 14px/1.45 system-ui, sans-serif; }
+  h1 { font-size: 18px; margin: 0 0 12px; }
+  table { border-collapse: collapse; width: 100%; }
+  td, th { border-bottom: 1px solid var(--line); padding: 6px 8px; text-align: left; vertical-align: top; }
+  code { font-size: 12px; word-break: break-all; }
+  .ok { color: var(--ok); font-weight: 600; } .bad { color: var(--bad); font-weight: 600; }
+  img { max-width: 220px; max-height: 70px; background: #fff; }
+  #log { white-space: pre-wrap; font: 12px/1.4 monospace; color: var(--muted); }
+</style>
+</head>
+<body>
+<h1>Banc du moteur embarqué</h1>
+<div id="status">Chargement…</div>
+<h2>OCR pix2tex (JavaScript) face à la référence Python</h2>
+<table id="ocr"><tr><th>Image</th><th>Attendu</th><th>Python</th><th>JavaScript</th><th>Conf. JS</th><th>ms</th></tr></table>
+<h2>Analyse et vérification</h2>
+<div id="log"></div>
+<script>
+  window.__allowNetwork = true;            // banc servi en HTTP : fetch() natif autorisé
+  window.__OCR_BASE = '../../android/app/src/main/assets/engine/models/pix2tex/';
+  window.__ORT_BASE = '../../android/app/src/main/assets/engine/ort/';
+  window.__enginePost = function (m) { if (m.type === 'status') document.getElementById('status').textContent = JSON.stringify(m); };
+  window.__results = { ocr: [], math: [] };
+</script>
+<script src="engine-bundle.js"></script>
+<script src="../../android/app/src/main/assets/engine/cortex/compute-engine.min.umd.js"></script>
+<script src="../../android/app/src/main/assets/engine/ort/ort.wasm.min.js"></script>
+<script>
+(async function () {
+  var log = function (s) { document.getElementById('log').textContent += s + '\n'; window.__results.math.push(s); };
+  var CE = window.ComputeEngine.ComputeEngine;
+  var math = makeMath(function () { return new CE(); });
+  ['3x-7=11', '\\frac{2}{3}+\\frac{5}{6}', '2x^{2}-3x-5=0', '\\operatorname{nCr}\\left(5,2\\right)', '\\sqrt{18}'].forEach(function (l) {
+    var r = math.analyze(l);
+    log(l + '  ->  ' + r.kind + ' / ' + r.route + (r.result ? ' / ' + r.result.latex : ''));
+  });
+  var rep = math.checkExplanation({ text: "On obtient $3x = 18$ puis $x = 6$.", ptype: 'equation', vars: ['x'], solutions: [{ x: 6 }], answers: [6], sources: ['3x-7=11', '3x = 18', 'x = 6'] });
+  log('fidélité (juste) : ' + JSON.stringify(rep));
+
+  var samples = await (await fetch('samples/samples.json')).json();
+  var t = document.getElementById('ocr');
+  await OCR.init();
+  for (var s of samples) {
+    var blob = await (await fetch('samples/' + s.file)).blob();
+    var b64 = await new Promise(function (res) { var fr = new FileReader(); fr.onload = function () { res(String(fr.result).split(',')[1]); }; fr.readAsDataURL(blob); });
+    var t0 = performance.now();
+    var r = await OCR.recognize({ imageBase64: b64, mime: 'image/png' });
+    var ms = Math.round(performance.now() - t0);
+    var same = r.raw === s.python;
+    window.__results.ocr.push({ file: s.file, expected: s.latex, python: s.python, js: r.raw, same: same, conf: r.confidence, ms: ms });
+    var tr = document.createElement('tr');
+    tr.innerHTML = '<td><img src="samples/' + s.file + '"><br>' + s.file + '</td><td><code></code></td><td><code></code></td><td><code></code> <span class="' + (same ? 'ok' : 'bad') + '">' + (same ? '= Python' : '≠ Python') + '</span></td><td>' + r.confidence + ' (py ' + s.confidence + ')</td><td>' + ms + '</td>';
+    var codes = tr.querySelectorAll('code');
+    codes[0].textContent = s.latex; codes[1].textContent = s.python; codes[2].textContent = r.raw;
+    t.appendChild(tr);
+  }
+  window.__results.done = true;
+  document.getElementById('status').textContent = 'Terminé';
+})().catch(function (e) { document.getElementById('status').textContent = 'ERREUR ' + e.message; window.__results.error = String(e); });
+</script>
+</body>
+</html>

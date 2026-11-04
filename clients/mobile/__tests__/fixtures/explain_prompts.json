@@ -1,0 +1,58 @@
+[
+ {
+  "problem": {
+   "statement_fr": "Résoudre dans $\\mathbb{R}$ l'équation $3x-7=11$.",
+   "answer_latex": "x \\in \\left\\{6\\right\\}",
+   "steps": [
+    {
+     "text_fr": "On regroupe les termes en x à gauche et les constantes à droite.",
+     "latex": "3x = 18"
+    },
+    {
+     "text_fr": "On divise les deux membres par 3.",
+     "latex": "x = 6"
+    },
+    {
+     "text_fr": "L'équation admet une unique solution : $x = 6$.",
+     "latex": null
+    }
+   ]
+  },
+  "level": "lycee",
+  "messages": [
+   {
+    "role": "system",
+    "content": "Tu es un professeur de mathématiques. Tu rédiges en français l'explication d'une résolution à partir d'étapes déjà calculées et vérifiées. Tu ne fais aucun calcul nouveau."
+   },
+   {
+    "role": "user",
+    "content": "Problème : Résoudre dans $\\mathbb{R}$ l'équation $3x-7=11$.\n\nÉtapes calculées (JSON) :\n[\n {\n  \"texte\": \"On regroupe les termes en x à gauche et les constantes à droite.\",\n  \"formule\": \"3x = 18\"\n },\n {\n  \"texte\": \"On divise les deux membres par 3.\",\n  \"formule\": \"x = 6\"\n },\n {\n  \"texte\": \"L'équation admet une unique solution : $x = 6$.\"\n }\n]\n\nRésultat : $x \\in \\left\\{6\\right\\}$\n\nRédige l'explication pour un élève de lycée : rédaction claire et rigoureuse, vocabulaire mathématique usuel.\nRègles :\n- Suis l'ordre des étapes, sans en ajouter ni en supprimer.\n- Toute formule est en LaTeX entre $...$. N'écris que des égalités présentes dans les étapes.\n- N'introduis aucun nombre absent des étapes.\n- Termine par une phrase qui donne le résultat."
+   }
+  ],
+  "prompt": "<|im_start|>system\nTu es un professeur de mathématiques. Tu rédiges en français l'explication d'une résolution à partir d'étapes déjà calculées et vérifiées. Tu ne fais aucun calcul nouveau.<|im_end|>\n<|im_start|>user\nProblème : Résoudre dans $\\mathbb{R}$ l'équation $3x-7=11$.\n\nÉtapes calculées (JSON) :\n[\n {\n  \"texte\": \"On regroupe les termes en x à gauche et les constantes à droite.\",\n  \"formule\": \"3x = 18\"\n },\n {\n  \"texte\": \"On divise les deux membres par 3.\",\n  \"formule\": \"x = 6\"\n },\n {\n  \"texte\": \"L'équation admet une unique solution : $x = 6$.\"\n }\n]\n\nRésultat : $x \\in \\left\\{6\\right\\}$\n\nRédige l'explication pour un élève de lycée : rédaction claire et rigoureuse, vocabulaire mathématique usuel.\nRègles :\n- Suis l'ordre des étapes, sans en ajouter ni en supprimer.\n- Toute formule est en LaTeX entre $...$. N'écris que des égalités présentes dans les étapes.\n- N'introduis aucun nombre absent des étapes.\n- Termine par une phrase qui donne le résultat.<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n"
+ },
+ {
+  "problem": {
+   "statement_fr": "Calculer la dérivée de la fonction $f(x) = x^{2} e^{x}$.",
+   "answer_latex": "x^{2} e^{x} + 2 x e^{x}",
+   "steps": [
+    {
+     "text_fr": "Dérivée d'un produit « u·v ».",
+     "latex": "f'(x) = 2 x e^{x} + x^{2} e^{x}"
+    }
+   ]
+  },
+  "level": "college",
+  "messages": [
+   {
+    "role": "system",
+    "content": "Tu es un professeur de mathématiques. Tu rédiges en français l'explication d'une résolution à partir d'étapes déjà calculées et vérifiées. Tu ne fais aucun calcul nouveau."
+   },
+   {
+    "role": "user",
+    "content": "Problème : Calculer la dérivée de la fonction $f(x) = x^{2} e^{x}$.\n\nÉtapes calculées (JSON) :\n[\n {\n  \"texte\": \"Dérivée d'un produit « u·v ».\",\n  \"formule\": \"f'(x) = 2 x e^{x} + x^{2} e^{x}\"\n }\n]\n\nRésultat : $x^{2} e^{x} + 2 x e^{x}$\n\nRédige l'explication pour un élève de collège : phrases courtes, vocabulaire simple, chaque calcul détaillé.\nRègles :\n- Suis l'ordre des étapes, sans en ajouter ni en supprimer.\n- Toute formule est en LaTeX entre $...$. N'écris que des égalités présentes dans les étapes.\n- N'introduis aucun nombre absent des étapes.\n- Termine par une phrase qui donne le résultat."
+   }
+  ],
+  "prompt": "<|im_start|>system\nTu es un professeur de mathématiques. Tu rédiges en français l'explication d'une résolution à partir d'étapes déjà calculées et vérifiées. Tu ne fais aucun calcul nouveau.<|im_end|>\n<|im_start|>user\nProblème : Calculer la dérivée de la fonction $f(x) = x^{2} e^{x}$.\n\nÉtapes calculées (JSON) :\n[\n {\n  \"texte\": \"Dérivée d'un produit « u·v ».\",\n  \"formule\": \"f'(x) = 2 x e^{x} + x^{2} e^{x}\"\n }\n]\n\nRésultat : $x^{2} e^{x} + 2 x e^{x}$\n\nRédige l'explication pour un élève de collège : phrases courtes, vocabulaire simple, chaque calcul détaillé.\nRègles :\n- Suis l'ordre des étapes, sans en ajouter ni en supprimer.\n- Toute formule est en LaTeX entre $...$. N'écris que des égalités présentes dans les étapes.\n- N'introduis aucun nombre absent des étapes.\n- Termine par une phrase qui donne le résultat.<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n"
+ }
+]
