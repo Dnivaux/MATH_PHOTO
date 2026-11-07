@@ -109,3 +109,17 @@ def test_latex_features():
     assert f == {"latex_len": 30, "n_vars": 1, "n_frac": 1, "max_power": 1, "n_functions": 1}
     assert latex_features(r"\frac{d}{dx}(x^{3}e^{x})")["n_vars"] == 1  # d et e ne sont pas des inconnues
     assert latex_features(None)["latex_len"] == 0
+
+
+def test_ocr_collect(client, tmp_path, monkeypatch):
+    body = {"image_base64": "aW1n", "condition": "papier", "device_latex": "x=1", "agree": True}
+    monkeypatch.setattr(gateway, "OCR_CAPTURE_DIR", None)
+    assert client.post("/v1/ocr/collect", json=body, headers={"Authorization": "Bearer dev-token"}).status_code == 404
+    monkeypatch.setattr(gateway, "OCR_CAPTURE_DIR", str(tmp_path))
+    assert client.post("/v1/ocr/collect", json=body).status_code == 401
+    for n in (1, 2):
+        r = client.post("/v1/ocr/collect", json=body, headers={"Authorization": "Bearer dev-token"})
+        assert r.status_code == 200 and r.json()["count"] == n
+    assert len(list((tmp_path / "collect" / "papier").glob("*.jpg"))) == 2
+    rows = (tmp_path / "collect" / "collect.jsonl").read_text().splitlines()
+    assert len(rows) == 2 and '"device_latex": "x=1"' in rows[0] and "aW1n" not in rows[0]

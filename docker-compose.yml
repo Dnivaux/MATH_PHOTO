@@ -149,7 +149,7 @@ services:
       - --lora-modules
       - teacher-ft=/registry/math-7b-teacher/model
       - --max-model-len=4096
-      - --gpu-memory-utilization=${GPU_UTIL:-0.85}
+      - --gpu-memory-utilization=${GPU_UTIL:-0.80}   # le reste : TexTeller (service ocr) et le bureau
     environment:
       HF_HUB_OFFLINE: "1"   # poids de base déjà dans le cache de l'hôte, monté en lecture seule
     volumes:
@@ -192,11 +192,23 @@ services:
     restart: unless-stopped
 
   ocr:
-    # OCR serveur (TexTeller, CPU) : relit les photos que le téléphone a lues avec peu de certitude.
-    build: {context: ., dockerfile: serving/ocr/Dockerfile}
+    # OCR serveur (TexTeller sur GPU, ~1 Go à côté de vLLM) : relit les photos que le téléphone a lues avec peu
+    # de certitude. Sans GPU : OCR_DEVICE=cpu (et l'image peut être construite avec TORCH_INDEX=.../whl/cpu).
+    build:
+      context: .
+      dockerfile: serving/ocr/Dockerfile
+      args: {TORCH_INDEX: "${OCR_TORCH_INDEX:-https://download.pytorch.org/whl/cu132}"}
     profiles: [gpu]
     environment:
+      OCR_DEVICE: ${OCR_DEVICE:-cuda}
       OCR_THREADS: ${OCR_THREADS:-4}
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
     volumes:
       - ${HF_HOME:-~/.cache/huggingface}:/hf:ro   # poids TexTeller déjà téléchargés par .venv-ocr
     healthcheck:

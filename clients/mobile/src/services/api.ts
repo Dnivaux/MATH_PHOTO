@@ -2,7 +2,7 @@
  * Client de la gateway, contrat v1 de MATH_PHOTO (serving/gateway/schema.py, docs/api/openapi.json).
  * Gateway factice : `make mock` (port 8100, jeton dev-token).
  */
-import { getSettings } from '../config';
+import { getSettings, OcrCondition } from '../config';
 import { effectiveMode } from '../device';
 import type { Level } from '../explain/prompt';
 
@@ -208,6 +208,18 @@ export function ocrOnServer(imageBase64: string, signal?: AbortSignal): Promise<
     20000,
     signal,
   );
+}
+
+/** Développement : garde la zone scannée et les lectures du téléphone sur le serveur (banc OCR réel) */
+export function collectOcr(body: {
+  image_base64: string;
+  condition: OcrCondition;
+  device_latex: string;
+  device_alt: string | null;
+  agree: boolean;
+  confidence: number;
+}): Promise<{ id: string; count: number }> {
+  return call<{ id: string; count: number }>('POST', '/v1/ocr/collect', body, 20000);
 }
 
 /** Message affiché pour un code d'erreur du serveur */

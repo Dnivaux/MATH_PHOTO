@@ -2,7 +2,7 @@
 
 La gateway l'appelle quand un client escalade avec la photo (lecture incertaine sur le téléphone, LaTeX
 invalide). Sur le banc synthétique : TexTeller 71 % d'équivalence contre 8 % pour pix2tex brut (téléphone).
-Il tourne sur CPU (~0,6 s par formule avec 4 threads) pour laisser le GPU à vLLM.
+Sur GPU à côté de vLLM (~0,12 à 0,19 s par photo, ~1,7 Go) ; OCR_DEVICE=cpu sinon (~0,7 s avec 4 threads).
 
     uvicorn serving.ocr.service:app --port 8300        (venv .venv-ocr : TexTeller impose transformers 4.x)
 """
@@ -70,6 +70,14 @@ def _predict(img_bytes: bytes) -> str:
 def _warmup() -> None:
     if os.getenv("OCR_PRELOAD", "1") == "1":
         _load()
+        # première lecture : initialisation de CUDA (~5 s) faite ici, pas sur la première photo d'un utilisateur
+        from PIL import Image, ImageDraw
+
+        img = Image.new("RGB", (256, 64), "white")
+        ImageDraw.Draw(img).text((10, 20), "x+1=2", fill="black")
+        buf = io.BytesIO()
+        img.save(buf, "PNG")
+        _predict(buf.getvalue())
 
 
 @app.get("/health")

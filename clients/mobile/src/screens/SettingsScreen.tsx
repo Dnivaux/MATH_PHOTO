@@ -324,6 +324,19 @@ export const SettingsScreen: React.FC<Props> = ({ navigation }) => {
                   />
                 ))}
               </View>
+              <Text style={[type.label, styles.pad, { color: c.textMuted }]}>
+                Collecte pour le banc : chaque scan est gardé sur le serveur (OCR_CAPTURE_DIR)
+              </Text>
+              <View style={styles.chips}>
+                {([null, 'papier', 'ecran', 'manuscrit'] as const).map(v => (
+                  <Chip
+                    key={v ?? 'off'}
+                    label={v === null ? 'Non' : v === 'ecran' ? 'Écran' : v[0].toUpperCase() + v.slice(1)}
+                    selected={s.ocrCollect === v}
+                    onPress={() => updateSettings({ ocrCollect: v })}
+                  />
+                ))}
+              </View>
               <Row
                 title="Moteur"
                 subtitle={`CortexJS : ${engine.cortex} · OCR : ${engine.ocr}${engine.ocrLoadMs ? ` (chargé en ${engine.ocrLoadMs} ms)` : ''}${engine.error ? ` · ${engine.error}` : ''}`}

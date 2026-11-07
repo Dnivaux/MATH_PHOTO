@@ -14,7 +14,7 @@ import { showSnackbar } from '../components/ui/Snackbar';
 import { useResizableBox } from '../hooks/useResizableBox';
 import { EngineStatus, FractionRect, MathEngine } from '../engine/MathEngine';
 import { fileToBase64, recognizeOnDevice } from '../services/ocr';
-import { ocrOnServer } from '../services/api';
+import { collectOcr, ocrOnServer } from '../services/api';
 import { looksGarbled, normalizeOcrLatex } from '../engine/latexPreprocess';
 import { getSettings, subscribeSettings, updateSettings } from '../config';
 import { pendingCount } from '../pipeline/queue';
@@ -130,6 +130,19 @@ export const CameraScannerScreen: React.FC<Props> = ({ navigation }) => {
     try {
       const res = await recognizeOnDevice(base64, mime, crop);
       const s = getSettings();
+      if (s.ocrCollect && res.image) {
+        const condition = s.ocrCollect;
+        collectOcr({
+          image_base64: res.image,
+          condition,
+          device_latex: res.latex,
+          device_alt: res.alt,
+          agree: res.agree,
+          confidence: res.confidence,
+        })
+          .then(r => showSnackbar(`Collecte ${condition} : photo n° ${r.count} gardée`, { offset: CONTROLS_HEIGHT }))
+          .catch(e => showSnackbar(`Collecte impossible : ${e?.message ?? e}`, { offset: CONTROLS_HEIGHT }));
+      }
       const readable = (l: string | null): l is string => !!l && !looksGarbled(l);
       let doubtful = !res.agree || !readable(res.latex);
       if (!doubtful) {

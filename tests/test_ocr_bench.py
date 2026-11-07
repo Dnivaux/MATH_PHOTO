@@ -8,6 +8,9 @@ def test_texteller_delimiters():
     assert strip_delimiters(r"\[-3x^{2}+23x-30=0\]") == "-3x^{2}+23x-30=0"
     assert strip_delimiters("$x+1$") == "x+1" and strip_delimiters("$$x+1$$") == "x+1"
     assert normalize(r"\[5-6x=6-9x\]") == normalize("5 - 6 x = 6 - 9 x")
+    assert normalize(r"\vert x+y \vert") == normalize("| x + y |")
+    assert normalize(r"{ \frac { d } { d x } } ( x ^ { 2 } )") == normalize(r"\frac{d}{dx}(x^{2})")
+    assert normalize(r"\frac{1}{2}") != normalize(r"12")
     assert equivalent(r"\[x^{2}+4x-5=0\]", "x^{2} + 4 x - 5 = 0")
     assert not equivalent(r"\[x^{2}+4x-6=0\]", "x^{2} + 4 x - 5 = 0")
 

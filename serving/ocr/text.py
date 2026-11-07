@@ -64,5 +64,9 @@ def canonicalize(latex: str) -> str:
     s = re.sub(r"\\rightarrow(?![a-zA-Z])", r"\\to", s)
     s = re.sub(r"\\int\s*_\s*\{\s*\}(\s*\^\s*\{\s*\})?", r"\\int", s)  # bornes vides
     s = re.sub(r"\\[,:;! ](?![a-zA-Z])|\\q?quad(?![a-zA-Z])", " ", s)
+    s = re.sub(r"\{\s*\\(sf|rm|it|bf|tt)(?![a-zA-Z])\s*([^{}]*)\}", r"\2", s)  # {\sf x} -> x (anciens styles)
+    s = re.sub(r"\\(sf|rm|it|bf|tt)(?![a-zA-Z])", "", s)
     s = re.sub(r"^\s*=\s*", "", s)                                     # une formule ne commence pas par =
+    s = re.sub(r"^\s*(\.\s*|\\cdot\s*|\\bullet\s*)+(?=\S)", "", s)     # point de numérotation en tête
+    s = re.sub(r"(\s*[;,]|\s*\.(?!\d))+\s*$", "", s)                   # ponctuation finale
     return re.sub(r"\s+", " ", s).strip()

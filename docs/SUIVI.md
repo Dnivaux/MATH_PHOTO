@@ -181,6 +181,28 @@ La photo ne quitte le téléphone que dans ces cas d'escalade, et n'est gardée 
   premières : photos d'écran (moiré) et morceaux de lignes voisines dans le cadre. Pistes : lisser avant lecture,
   effacer ce qui touche le bord, relecture serveur en parallèle du second lecteur.
 
+## OCR : banc de vraies photos et manuscrit (7 novembre)
+
+Objectif : un OCR bien meilleur sur papier, écran et manuscrit, côté téléphone et serveur.
+
+- Les 44 images gardées par le serveur le 4 novembre ne comptent que 4 vraies photos (écran) ; le reste vient du test
+  de charge. Erreurs réelles : point de numérotation lu `-` ou `\therefore`, parenthèse effacée par le moiré.
+- **Mode collecte** : app → Outils de développement → OCR → Collecte (Papier / Écran / Manuscrit). Chaque scan envoie
+  la zone recadrée et les deux lectures du téléphone à `POST /v1/ocr/collect` (seulement si `OCR_CAPTURE_DIR`).
+  `make ocr-collect-import` range les scans dans `data/ocr/real/<condition>/` et les rattache à la formule de la
+  planche la plus proche (rattachements douteux listés, `checked_by_hand: true` après correction).
+- **Manuscrit public** : `scripts/ocr_unimer_subset.py` (UniMER-Test, Apache 2.0) → `data/ocr/unimer/hwe300`,
+  300 formules manuscrites du périmètre de l'app.
+
+| Lecteur (hwe300, manuscrit) | Formules justes | Erreur par token |
+|---|---|---|
+| pix2text-mfr v1 INT8 (téléphone) | 78,0 % | 11,2 % |
+| pix2text-mfr 1.5 INT8 (téléphone) | 68,3 % | 19,8 % |
+| TexTeller (serveur, GPU) | 98,3 % (possible recouvrement avec son entraînement) | 0,3 % |
+
+Vote du téléphone : accord sur 205 images sur 300, dont 192 justes (contre 100 % sur l'imprimé synthétique).
+Chaîne actuelle (accord → téléphone, sinon serveur) : 94,7 % ; hors connexion : 78 %.
+
 ## Suite
 
 Relancer : `make up` (tout), ou `make infra-up` seul pour entraîner. Gateway sur :8100, jeton `dev-token`.

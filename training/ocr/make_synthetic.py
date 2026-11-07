@@ -66,6 +66,28 @@ def augment(formula: Image.Image, rng: random.Random) -> Image.Image:
     pad = rng.randint(20, 80)
     img = background(formula.width + 2 * pad, formula.height + 2 * pad, rng)
     img.paste(formula, (pad, pad), formula)
+    return photo_effects(img, rng)
+
+
+def moire(img: Image.Image, rng: random.Random) -> Image.Image:
+    """Photo d'un écran : grille de pixels et franges d'interférence (battement de deux réseaux proches)."""
+    arr = np.asarray(img).astype(np.float32)
+    h, w = arr.shape[:2]
+    y, x = np.mgrid[0:h, 0:w].astype(np.float32)
+    a = rng.uniform(0, np.pi)
+    f1, f2 = rng.uniform(0.28, 0.42), rng.uniform(0.28, 0.42)
+    u = x * np.cos(a) + y * np.sin(a)
+    v = -x * np.sin(a) + y * np.cos(a)
+    pattern = np.sin(2 * np.pi * f1 * u) * np.sin(2 * np.pi * (f1 + rng.uniform(0.005, 0.03)) * u + 1.0) \
+        + 0.6 * np.sin(2 * np.pi * f2 * v)
+    arr *= (1 - rng.uniform(0.05, 0.18) * (0.5 + 0.25 * pattern))[..., None]
+    tint = np.array([rng.uniform(0.9, 1.0), rng.uniform(0.92, 1.0), rng.uniform(0.95, 1.05)], dtype=np.float32)
+    return Image.fromarray(np.clip(arr * tint, 0, 255).astype(np.uint8))
+
+
+def photo_effects(img: Image.Image, rng: random.Random, screen: bool = False) -> Image.Image:
+    if screen:
+        img = moire(img, rng)
     if rng.random() < 0.7:  # éclairage inégal / ombre
         arr = np.asarray(img).astype(np.float32)
         h, w = arr.shape[:2]

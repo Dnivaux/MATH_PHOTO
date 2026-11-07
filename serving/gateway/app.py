@@ -24,7 +24,8 @@ from serving.gateway import admin, metrics, models, pipeline, usage
 from serving.gateway.auth import require_token
 from serving.gateway.features import latex_features
 from serving.gateway.schema import (
-    ExplainRequest, ExplainResponse, Explanation, Health, ModelInfo, OcrRequest, OcrResponse, SolveRequest, SolveResponse,
+    ExplainRequest, ExplainResponse, Explanation, Health, ModelInfo, OcrCollectRequest, OcrCollectResponse, OcrRequest,
+    OcrResponse, SolveRequest, SolveResponse,
 )
 from serving.gateway.usage import Principal
 
@@ -130,6 +131,23 @@ def _capture(rid: str, image_base64: str, latex: str) -> None:
     (d / f"{time.strftime('%Y%m%d-%H%M%S')}-{rid[:8]}.jpg").write_bytes(base64.b64decode(image_base64))
     with (d / "captures.jsonl").open("a") as f:
         f.write(json.dumps({"request_id": rid, "latex_server": latex, "at": time.time()}) + "\n")
+
+
+@app.post("/v1/ocr/collect", response_model=OcrCollectResponse)
+def ocr_collect(req: OcrCollectRequest, who: Principal = Depends(require_token)):
+    """Mode collecte de l'app : chaque zone scannée est gardée avec les lectures du téléphone (banc OCR réel)."""
+    if not OCR_CAPTURE_DIR:
+        raise HTTPException(404, "collecte désactivée : OCR_CAPTURE_DIR")
+    import base64
+
+    d = Path(OCR_CAPTURE_DIR, "collect")
+    (d / req.condition).mkdir(parents=True, exist_ok=True)
+    cid = f"{time.strftime('%Y%m%d-%H%M%S')}-{uuid.uuid4().hex[:8]}"
+    (d / req.condition / f"{cid}.jpg").write_bytes(base64.b64decode(req.image_base64))
+    row = req.model_dump(exclude={"image_base64"}) | {"id": cid, "file": f"{req.condition}/{cid}.jpg", "at": time.time()}
+    with (d / "collect.jsonl").open("a") as f:
+        f.write(json.dumps(row, ensure_ascii=False) + "\n")
+    return OcrCollectResponse(id=cid, count=len(list((d / req.condition).glob("*.jpg"))))
 
 
 @app.post("/v1/explain", response_model=ExplainResponse)

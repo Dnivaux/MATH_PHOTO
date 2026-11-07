@@ -32,11 +32,30 @@ def normalize(latex: str) -> str:
     s = re.sub(r"\\(left|right|displaystyle|mathrm|operatorname|limits)\b", "", s)
     s = re.sub(r"\\[,;:! ]", "", s)
     s = s.replace("\\dfrac", "\\frac").replace("\\cdot", "\\times")
+    s = re.sub(r"\\[vV]ert\b|\\mid\b", "|", s)
     s = re.sub(r"\{\s*\}", "", s)
     s = re.sub(r"\\(sin|cos|tan|ln|log|exp)\s*\{(\([^{}]*\))\}", r"\\\1\2", s)  # \sin{(2x)} -> \sin(2x)
     s = re.sub(r"\s+", "", s)
+    s = _drop_bare_groups(s)
     s = re.sub(r"\{([a-zA-Z0-9])\}", r"\1", s)  # x^{2} -> x^2, \sin{x} -> \sinx
     return s
+
+
+def _drop_bare_groups(s: str) -> str:
+    """{\frac{d}{dx}}(x) -> \frac{d}{dx}(x) : accolades qui ne sont l'argument de rien (pas après ^, _, une
+    commande, ni un autre argument). Sur une chaîne sans espaces."""
+    out, stack = list(s), []
+    for i, ch in enumerate(s):
+        if ch == "{":
+            j = i - 1
+            prev = s[j] if j >= 0 else ""
+            is_arg = (prev != "" and prev in "^_}]") or (prev.isalpha() and re.search(r"\\[a-zA-Z]+$", s[:i]) is not None)
+            stack.append((i, is_arg))
+        elif ch == "}" and stack:
+            j, is_arg = stack.pop()
+            if not is_arg:
+                out[j] = out[i] = ""
+    return "".join(out)
 
 
 def tokens(latex: str) -> list[str]:
@@ -146,7 +165,23 @@ def load_pp_formulanet(name: str, threads: int):
     return predict
 
 
-MODELS = {"pix2tex": "pix2tex", "texteller": "texteller",
+def load_service(url: str):
+    """Service OCR de la stack (serving/ocr/service.py) : mesure exactement ce que fait la production."""
+    import base64
+    import io
+    import urllib.request
+
+    def predict(img: Image.Image) -> str:
+        buf = io.BytesIO()
+        img.save(buf, "PNG")
+        body = json.dumps({"image_base64": base64.b64encode(buf.getvalue()).decode()}).encode()
+        req = urllib.request.Request(url, data=body, headers={"Content-Type": "application/json"})
+        return json.load(urllib.request.urlopen(req, timeout=60))["latex"]
+
+    return predict
+
+
+MODELS = {"pix2tex": "pix2tex", "texteller": "texteller", "texteller-service": "texteller-service",
           "p2t-mfr": "breezedeus/pix2text-mfr", "p2t-mfr-1.5": "breezedeus/pix2text-mfr-1.5",
           "pp-formulanet-plus-s": "PP-FormulaNet_plus-S", "pp-formulanet-s": "PP-FormulaNet-S"}
 
@@ -161,6 +196,9 @@ def main() -> None:
     ap.add_argument("--onnx", type=Path, default=None,
                     help="dossier d'un lecteur exporté pour l'app (clients/mobile/scripts/p2t_mfr/export.py)")
     ap.add_argument("--variant", default="int8", choices=["fp32", "fp16", "int8"], help="avec --onnx")
+    ap.add_argument("--service-url", default="http://localhost:8300/ocr", help="avec --model texteller-service")
+    ap.add_argument("--preprocess", default="none", choices=["none", "light", "clean"],
+                    help="light : éclairage corrigé comme dans l'app ; clean : serving/ocr/preprocess.clean")
     args = ap.parse_args()
 
     data = Path(args.data)
@@ -188,10 +226,23 @@ def main() -> None:
         predict = load_pix2tex()
     elif args.model == "texteller":
         predict = load_texteller(args.device)
+    elif args.model == "texteller-service":
+        predict, args.device = load_service(args.service_url), "service"
     elif args.model.startswith("pp-"):
         predict, args.device = load_pp_formulanet(MODELS[args.model], args.threads), f"cpu-paddle-{args.threads}t"
     else:
         predict, args.device = load_p2t_mfr(MODELS[args.model], args.threads), f"cpu-onnx-{args.threads}t"
+    if args.preprocess != "none":
+        from serving.ocr import preprocess as prep
+
+        model_predict = predict
+
+        def predict(img, _p=model_predict):
+            if args.preprocess == "light":
+                img = Image.fromarray(prep.normalize_light(img).astype("uint8"))
+            else:
+                img = prep.clean(img)
+            return _p(img.convert("RGB"))
     predict(Image.open(data / labels[0]["file"]).convert("RGB"))  # chauffe (chargement CUDA)
 
     rows = []
@@ -222,10 +273,11 @@ def main() -> None:
         metrics[f"math_equivalence.type.{t}"] = 100 * statistics.mean(r["equivalent"] or r["exact"] for r in sub)
 
     tracking.init()
-    with mlflow.start_run(run_name=f"ocr-{args.model}-{data.name}"):
+    suffix = "" if args.preprocess == "none" else f"-{args.preprocess}"
+    with mlflow.start_run(run_name=f"ocr-{args.model}-{data.name}{suffix}"):
         mlflow.set_tags({"stage": "eval", "task": "ocr", "role": "quantization" if args.onnx else "baseline",
-                         "model": args.model, "dataset": data.name})
-        params = {"model": args.model, "data": str(data), "device": args.device}
+                         "model": args.model, "dataset": data.name, "preprocess": args.preprocess})
+        params = {"model": args.model, "data": str(data), "device": args.device, "preprocess": args.preprocess}
         if args.onnx:
             files = reader.cfg["variants"][args.variant]
             size = sum(reader.cfg["files"][files[k]]["bytes"] for k in ("encoder", "decoder"))

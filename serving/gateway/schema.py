@@ -188,3 +188,18 @@ class OcrResponse(BaseModel):
     model: str = "texteller"
     ms: float
 
+
+class OcrCollectRequest(BaseModel):
+    """Développement : une zone lue par le téléphone, gardée pour le banc de vraies photos (data/ocr/real)."""
+    image_base64: str = Field(max_length=11_000_000)
+    condition: Literal["papier", "ecran", "manuscrit"]
+    device_latex: str = Field(default="", max_length=2000, description="Lecture du premier lecteur (pix2text-mfr v1)")
+    device_alt: str | None = Field(default=None, max_length=2000, description="Lecture du second, si elle diffère")
+    agree: bool = True
+    confidence: float | None = None
+
+
+class OcrCollectResponse(BaseModel):
+    id: str
+    count: int = Field(description="Nombre de photos gardées pour cette condition")
+

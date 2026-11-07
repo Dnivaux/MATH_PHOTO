@@ -70,4 +70,10 @@ drift: ## dérive des requêtes reçues (Evidently) ; HOURS=168, ARGS="--include
 load-test: ## test de charge par paliers (stack lancée : make up) ; USERS="1 4 8 16 32" DURATION=60
 	$(PY) -m eval.load_test --users $(or $(USERS),1 4 8 16 32) --duration $(or $(DURATION),60)
 
+COLLECT_TMP := /tmp/photo-maths-collect
+ocr-collect-import: ## scans du mode collecte de l'app -> data/ocr/real/<papier|ecran|manuscrit>/
+	rm -rf $(COLLECT_TMP) && mkdir -p $(COLLECT_TMP)
+	docker run --rm -v photo-maths_modelcache:/cache:ro -v $(COLLECT_TMP):/out alpine sh -c 'cp -r /cache/ocr-captures/collect/. /out/ && chown -R $(shell id -u):$(shell id -g) /out'
+	$(PY) scripts/ocr_collect_import.py --src $(COLLECT_TMP)
+
 .PHONY: help infra-up infra-down up up-ci mlflow-hygiene env llamacpp env-check test contract mock data-eval data-train eval-code eval-passk eval-explain report

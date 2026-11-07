@@ -24,7 +24,11 @@ export interface AppSettings {
   devMode: boolean;
   /** Consigne de cadrage déjà montrée */
   cameraTipSeen: boolean;
+  /** Développement : chaque zone scannée est envoyée au serveur pour le banc OCR de vraies photos */
+  ocrCollect: OcrCondition | null;
 }
+
+export type OcrCondition = 'papier' | 'ecran' | 'manuscrit';
 
 export const DEFAULT_SETTINGS: AppSettings = {
   serverUrl: 'http://10.0.2.2:8100',
@@ -36,6 +40,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   modelUrl: '',
   devMode: false,
   cameraTipSeen: false,
+  ocrCollect: null,
 };
 
 let settings: AppSettings = { ...DEFAULT_SETTINGS };
