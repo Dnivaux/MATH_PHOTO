@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -44,6 +45,7 @@ def main() -> None:
     ap.add_argument("--users", type=int, nargs="+", default=[1, 4, 8, 16])
     ap.add_argument("--duration", type=int, default=90, help="secondes par palier")
     ap.add_argument("--budget-ms", type=float, default=5000, help="p95 acceptable pour /v1/solve")
+    ap.add_argument("--env", default="local", help="local (PC, GPU) | staging (VM, faux LLM) : tag et nom des runs")
     args = ap.parse_args()
 
     tracking.init()
@@ -68,10 +70,12 @@ def main() -> None:
                 if r["Name"] != "Aggregated" and int(r["Request Count"]):
                     metrics[f"{slug(r['Name'])}.p50_ms"] = float(r["50%"])
                     metrics[f"{slug(r['Name'])}.p95_ms"] = float(r["95%"])
-            with mlflow.start_run(run_name=f"load-{users}u"):
-                mlflow.set_tags({"stage": "eval", "task": "load", "role": "load_test"})
+            name = f"load-{users}u" if args.env == "local" else f"load-{args.env}-{users}u"
+            with mlflow.start_run(run_name=name):
+                mlflow.set_tags({"stage": "eval", "task": "load", "role": "load_test", "env": args.env})
                 mlflow.log_params({"users": users, "duration_s": args.duration, "host": args.host, "budget_ms": args.budget_ms,
-                                   "mix": "solve 8 : ocr 1 : models 1, attente 1-3 s"})
+                                   "mix": "solve 8 : ocr 1 : models 1, attente 1-3 s",
+                                   "skip": os.getenv("LOAD_SKIP", "")})
                 mlflow.log_metrics(metrics)
                 for f in out.glob(f"u{users}*"):
                     mlflow.log_artifact(str(f))

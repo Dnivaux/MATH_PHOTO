@@ -10,13 +10,14 @@ variable "vm_name" {
 }
 
 variable "vcpu" {
-  type    = number
-  default = 4
+  description = "8 : le bac à sable du compose réserve 8 cœurs (SANDBOX_CPUS)"
+  type        = number
+  default     = 8
 }
 
 variable "memory_mb" {
   type    = number
-  default = 8192
+  default = 12288
 }
 
 variable "disk_gb" {

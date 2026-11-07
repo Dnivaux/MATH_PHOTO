@@ -9,6 +9,9 @@ Lancé par eval/load_test.py (paliers d'utilisateurs, résultats dans MLflow) ou
 
 LOAD_TYPES=limit,integral ne tire que ces types : trafic volontairement déséquilibré, pour montrer que
 eval/drift.py détecte la dérive.
+
+LOAD_SKIP=ocr,models retire ces requêtes : sur la VM de staging (profil ci), pas de service OCR ni de champion
+dans le registry, ces endpoints répondent en erreur par construction.
 """
 
 from __future__ import annotations
@@ -29,6 +32,7 @@ if os.getenv("LOAD_TYPES"):
 _ocr = ROOT / "data/ocr/synthetic"
 IMAGES = [base64.b64encode((_ocr / json.loads(line)["file"]).read_bytes()).decode()
           for line in (_ocr / "labels.jsonl").read_text().splitlines()[:40] if line.strip()] if _ocr.exists() else []
+SKIP = set(filter(None, os.getenv("LOAD_SKIP", "").split(",")))
 CLIENT = {"platform": "android", "app_version": "locust", "mode": "complet"}
 
 
@@ -49,9 +53,10 @@ class Phone(HttpUser):
 
     @task(1)
     def ocr(self):
-        if IMAGES:
+        if IMAGES and "ocr" not in SKIP:
             self.client.post("/v1/ocr", json={"image_base64": random.choice(IMAGES), "client": CLIENT}, name="/v1/ocr")
 
     @task(1)
     def model_update(self):
-        self.client.get("/v1/models/android/latest", name="/v1/models/{client}/latest")
+        if "models" not in SKIP:
+            self.client.get("/v1/models/android/latest", name="/v1/models/{client}/latest")

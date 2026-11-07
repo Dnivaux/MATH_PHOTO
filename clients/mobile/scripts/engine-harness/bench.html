@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Banc OCR</title>
+<style>
+  :root { --bg: #F7F5F0; --text: #1B1D24; --muted: #555865; }
+  body { margin: 0; padding: 16px; background: var(--bg); color: var(--text); font: 14px/1.45 system-ui, sans-serif; }
+  #log { white-space: pre-wrap; font: 12px/1.4 monospace; color: var(--muted); }
+</style>
+</head>
+<body>
+<h1>Banc OCR <span id="variant"></span></h1>
+<div id="status">Chargement…</div>
+<div id="log"></div>
+<!--
+  Vitesse des lecteurs OCR sur l'appareil, même code que la WebView de l'app (onnxruntime-web, WASM, un fil).
+  Servie par scripts/device-ocr-bench.mjs : ?variant=int8|fp32|fp16 choisit les fichiers ONNX, ?reps=N répète.
+-->
+<script>
+  var q = new URLSearchParams(location.search);
+  var VARIANT = q.get('variant') || 'int8', REPS = +(q.get('reps') || 3);
+  document.getElementById('variant').textContent = VARIANT;
+  window.__allowNetwork = true;
+  window.__OCR_BASE = '/ocr/' + VARIANT + '/';
+  window.__ORT_BASE = '/android/app/src/main/assets/engine/ort/';
+  window.__enginePost = function () {};
+</script>
+<script src="engine-bundle.js"></script>
+<script src="/android/app/src/main/assets/engine/ort/ort.wasm.min.js"></script>
+<script>
+(async function () {
+  var log = function (s) { document.getElementById('log').textContent += s + '\n'; };
+  var out = { variant: VARIANT, reps: REPS, userAgent: navigator.userAgent, runs: [] };
+  var t0 = performance.now();
+  await OCR.init();
+  out.loadMs = Math.round(performance.now() - t0);
+  log('chargement ' + out.loadMs + ' ms');
+  var samples = await (await fetch('samples/samples.json')).json();
+  for (var rep = 0; rep < REPS; rep++) {
+    for (var s of samples) {
+      var blob = await (await fetch('samples/' + s.file)).blob();
+      var b64 = await new Promise(function (res) { var fr = new FileReader(); fr.onload = function () { res(String(fr.result).split(',')[1]); }; fr.readAsDataURL(blob); });
+      var r = await OCR.recognize({ imageBase64: b64, mime: 'image/png' });
+      r.readings.forEach(function (rd, i) {
+        out.runs.push({ rep: rep, file: s.file, reader: rd.model, ms: rd.ms, tokens: rd.tokens, raw: rd.raw, python: s.python[i] });
+      });
+      document.getElementById('status').textContent = 'passe ' + (rep + 1) + '/' + REPS + ' : ' + s.file + ' ' + r.inferenceMs + ' ms';
+    }
+  }
+  document.getElementById('status').textContent = 'Terminé';
+  return out;
+})().then(function (out) { return fetch('/__results', { method: 'POST', body: JSON.stringify(out) }); },
+          function (e) {
+            document.getElementById('status').textContent = 'ERREUR ' + e.message;
+            return fetch('/__results', { method: 'POST', body: JSON.stringify({ variant: VARIANT, error: String(e) }) });
+          });
+</script>
+</body>
+</html>

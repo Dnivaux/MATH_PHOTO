@@ -67,8 +67,16 @@ vm-down: ## détruit la VM de staging
 drift: ## dérive des requêtes reçues (Evidently) ; HOURS=168, ARGS="--include-load --fail-on-drift"
 	$(PY) -m eval.drift --hours $(or $(HOURS),168) $(ARGS)
 
-load-test: ## test de charge par paliers (stack lancée : make up) ; USERS="1 4 8 16 32" DURATION=60
-	$(PY) -m eval.load_test --users $(or $(USERS),1 4 8 16 32) --duration $(or $(DURATION),60)
+load-test: ## test de charge par paliers (stack lancée : make up) ; USERS="1 4 8 16 32" DURATION=60 ; VM : HOST=http://<ip>:8100 ENV=staging
+	$(PY) -m eval.load_test --users $(or $(USERS),1 4 8 16 32) --duration $(or $(DURATION),60) --host $(or $(HOST),http://localhost:8100) --env $(or $(ENV),local)
+
+DEVICE ?= S24 Ultra
+device-llm: ## vitesse et RAM des 6 GGUF sur le téléphone branché (llama-bench par adb) ; DEVICE="S24 Ultra"
+	test -x third_party/llama.cpp/build-android/bin/llama-bench || infra/setup/build_llamacpp_android.sh
+	$(PY) -m eval.device_kernels llm --device "$(DEVICE)"
+device-ocr: ## vitesse de l'OCR INT8 / FP32 sur le téléphone (Chrome, même code WASM que l'app) ; DEVICE="S24 Ultra"
+	mkdir -p eval/results && cd clients/mobile && node scripts/build-harness.mjs && node scripts/device-ocr-bench.mjs --out ../../eval/results/device-ocr.json
+	$(PY) -m eval.device_kernels ocr --file eval/results/device-ocr.json --device "$(DEVICE)"
 
 COLLECT_TMP := /tmp/photo-maths-collect
 ocr-collect-import: ## scans du mode collecte de l'app -> data/ocr/real/<papier|ecran|manuscrit>/

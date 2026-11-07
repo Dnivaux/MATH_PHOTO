@@ -1,0 +1,51 @@
+{
+ "device": "S24 Ultra",
+ "soc": "SM8650",
+ "threads": 4,
+ "prompt": 256,
+ "gen": 128,
+ "results": {
+  "base-q4_k_m": {
+   "pp_tok_s": 285.533102,
+   "tg_tok_s": 65.948169,
+   "tg_tok_s_std": 2.344381,
+   "ram_peak_mb": 834.953125,
+   "size_mb": 390.75328
+  },
+  "base-q8_0": {
+   "pp_tok_s": 436.817467,
+   "tg_tok_s": 61.023178,
+   "tg_tok_s_std": 0.725916,
+   "ram_peak_mb": 1296.36328125,
+   "size_mb": 633.495552
+  },
+  "base-f16": {
+   "pp_tok_s": 25.437026,
+   "tg_tok_s": 14.423535,
+   "tg_tok_s_std": 0.408473,
+   "ram_peak_mb": 1227.94921875,
+   "size_mb": 1192.230912
+  },
+  "p20-q4_k_m": {
+   "pp_tok_s": 329.540896,
+   "tg_tok_s": 73.141605,
+   "tg_tok_s_std": 1.114213,
+   "ram_peak_mb": 717.47265625,
+   "size_mb": 333.288448
+  },
+  "p20-q8_0": {
+   "pp_tok_s": 559.182011,
+   "tg_tok_s": 74.483912,
+   "tg_tok_s_std": 0.864696,
+   "ram_peak_mb": 1097.2578125,
+   "size_mb": 533.170176
+  },
+  "p20-f16": {
+   "pp_tok_s": 30.055555,
+   "tg_tok_s": 16.054474,
+   "tg_tok_s_std": 0.692947,
+   "ram_peak_mb": 1041.2890625,
+   "size_mb": 1003.431936
+  }
+ }
+}

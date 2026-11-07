@@ -16,10 +16,12 @@ runcmd:
   - usermod -aG docker ubuntu
   - git clone --branch ${repo_ref} ${repo_url} /opt/photo-maths
   - cp /opt/photo-maths/.env.example /opt/photo-maths/.env
+  # data/ n'est pas dans git : sans ce mkdir, Docker le crée (root) au montage et le conteneur ne peut plus y écrire
+  - mkdir -p /opt/photo-maths/data
   - chown -R ubuntu:ubuntu /opt/photo-maths
   - cd /opt/photo-maths && docker compose --profile ci build
   # jeu d'évaluation figé (graine fixe, identique à celui du PC) : le faux LLM y retrouve les problèmes
-  - cd /opt/photo-maths && docker compose --profile ci run --rm --no-deps -v /opt/photo-maths/data:/app/data gateway-ci python -m datagen.build_sets eval --per-type 50
+  - cd /opt/photo-maths && docker compose --profile ci run --rm --no-deps -v /opt/photo-maths/data:/app/data gateway-ci python -m datagen.build_sets eval --per-type 50 --no-mlflow
   - cd /opt/photo-maths && docker compose --profile ci up -d
 %{ if runner_token != "" ~}
   - mkdir -p /opt/actions-runner && chown ubuntu:ubuntu /opt/actions-runner

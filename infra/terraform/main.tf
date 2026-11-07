@@ -59,6 +59,13 @@ resource "libvirt_domain" "vm" {
     wait_for_lease = true
   }
 
+  # le provider ajoute un écran SPICE par défaut, absent de qemu-base (Arch) : VNC local à la place
+  graphics {
+    type           = "vnc"
+    listen_type    = "address"
+    listen_address = "127.0.0.1"
+  }
+
   console {
     type        = "pty"
     target_type = "serial"

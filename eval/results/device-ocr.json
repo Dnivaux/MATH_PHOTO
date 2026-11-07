@@ -1,0 +1,1317 @@
+{
+ "device": "SM-S928B",
+ "variants": [
+  {
+   "variant": "int8",
+   "reps": 3,
+   "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Mobile Safari/537.36",
+   "runs": [
+    {
+     "rep": 0,
+     "file": "00-rendu.png",
+     "reader": "p2t-mfr",
+     "ms": 2004,
+     "tokens": 7,
+     "raw": "3 x - 7 = 1 1",
+     "python": "3 x - 7 = 1 1"
+    },
+    {
+     "rep": 0,
+     "file": "00-rendu.png",
+     "reader": "p2t-mfr-1.5",
+     "ms": 2803,
+     "tokens": 19,
+     "raw": "\\mathbf { 3 } x - \\mathbf { 7 } = \\mathbf { 1 1 }",
+     "python": "\\mathbf { 3 } x - \\mathbf { 7 } = \\mathbf { 1 1 }"
+    },
+    {
+     "rep": 0,
+     "file": "00-photo.png",
+     "reader": "p2t-mfr",
+     "ms": 1927,
+     "tokens": 7,
+     "raw": "3 x - 7 = 1 1",
+     "python": "3 x - 7 = 1 1"
+    },
+    {
+     "rep": 0,
+     "file": "00-photo.png",
+     "reader": "p2t-mfr-1.5",
+     "ms": 1920,
+     "tokens": 7,
+     "raw": "3 x - 7 = 1 1",
+     "python": "3 x - 7 = 1 1"
+    },
+    {
+     "rep": 0,
+     "file": "01-rendu.png",
+     "reader": "p2t-mfr",
+     "ms": 2347,
+     "tokens": 13,
+     "raw": "2 x ^ { 2 } - 3 x - 5 = 0",
+     "python": "2 x ^ { 2 } - 3 x - 5 = 0"
+    },
+    {
+     "rep": 0,
+     "file": "01-rendu.png",
+     "reader": "p2t-mfr-1.5",
+     "ms": 2348,
+     "tokens": 13,
+     "raw": "2 x ^ { 2 } - 3 x - 5 = 0",
+     "python": "2 x ^ { 2 } - 3 x - 5 = 0"
+    },
+    {
+     "rep": 0,
+     "file": "01-photo.png",
+     "reader": "p2t-mfr",
+     "ms": 2393,
+     "tokens": 13,
+     "raw": "2 x ^ { 2 } - 3 x - 5 = 0",
+     "python": "2 x ^ { 2 } - 3 x - 5 = 0"
+    },
+    {
+     "rep": 0,
+     "file": "01-photo.png",
+     "reader": "p2t-mfr-1.5",
+     "ms": 2345,
+     "tokens": 13,
+     "raw": "2 x ^ { 2 } - 3 x - 5 = 0",
+     "python": "2 x ^ { 2 } - 3 x - 5 = 0"
+    },
+    {
+     "rep": 0,
+     "file": "02-rendu.png",
+     "reader": "p2t-mfr",
+     "ms": 2066,
+     "tokens": 9,
+     "raw": "\\frac 2 3 + \\frac 5 6",
+     "python": "\\frac 2 3 + \\frac 5 6"
+    },
+    {
+     "rep": 0,
+     "file": "02-rendu.png",
+     "reader": "p2t-mfr-1.5",
+     "ms": 2642,
+     "tokens": 17,
+     "raw": "\\frac { 2 } { 3 } + \\frac { 5 } { 6 }",
+     "python": "\\frac { 2 } { 3 } + \\frac { 5 } { 6 }"
+    },
+    {
+     "rep": 0,
+     "file": "02-photo.png",
+     "reader": "p2t-mfr",
+     "ms": 2668,
+     "tokens": 17,
+     "raw": "\\frac { 2 } { 3 } + \\frac { 5 } { 6 }",
+     "python": "\\frac { 2 } { 3 } + \\frac { 5 } { 6 }"
+    },
+    {
+     "rep": 0,
+     "file": "02-photo.png",
+     "reader": "p2t-mfr-1.5",
+     "ms": 2635,
+     "tokens": 17,
+     "raw": "\\frac { 2 } { 3 } + \\frac { 5 } { 6 }",
+     "python": "\\frac { 2 } { 3 } + \\frac { 5 } { 6 }"
+    },
+    {
+     "rep": 0,
+     "file": "03-rendu.png",
+     "reader": "p2t-mfr",
+     "ms": 2278,
+     "tokens": 12,
+     "raw": "\\int \\! x e ^ { x } \\, d x",
+     "python": "\\int \\! x e ^ { x } \\, d x"
+    },
+    {
+     "rep": 0,
+     "file": "03-rendu.png",
+     "reader": "p2t-mfr-1.5",
+     "ms": 2198,
+     "tokens": 11,
+     "raw": "\\int \\! x e ^ { x } d x",
+     "python": "\\int \\! x e ^ { x } d x"
+    },
+    {
+     "rep": 0,
+     "file": "04-rendu.png",
+     "reader": "p2t-mfr",
+     "ms": 3682,
+     "tokens": 30,
+     "raw": "\\operatorname* { l i m } _ { x \\to 0 } \\frac { \\operatorname { s i n } x } { x }",
+     "python": "\\operatorname* { l i m } _ { x \\to 0 } \\frac { \\operatorname { s i n } x } { x }"
+    },
+    {
+     "rep": 0,
+     "file": "04-rendu.png",
+     "reader": "p2t-mfr-1.5",
+     "ms": 4060,
+     "tokens": 33,
+     "raw": "\\underset { x \\to 0 } { \\operatorname* { l i m } } \\frac { \\operatorname { s i n } x } { x }",
+     "python": "\\underset { x \\to 0 } { \\operatorname* { l i m } } \\frac { \\operatorname { s i n } x } { x }"
+    },
+    {
+     "rep": 0,
+     "file": "04-photo.png",
+     "reader": "p2t-mfr",
+     "ms": 3390,
+     "tokens": 25,
+     "raw": "\\operatorname* { l i m } _ { x \\to 0 } \\frac { \\sin X } { x }",
+     "python": "\\operatorname* { l i m } _ { x \\to 0 } \\frac { \\sin X } { x }"
+    },
+    {
+     "rep": 0,
+     "file": "04-photo.png",
+     "reader": "p2t-mfr-1.5",
+     "ms": 4206,
+     "tokens": 35,
+     "raw": "\\underset { x \\to 0 } { \\operatorname* { l i m } } \\frac { \\operatorname { s i n } { x } } { x }",
+     "python": "\\operatorname* { l i m } _ { x \\to 0 } \\frac { \\operatorname { s i n } { x } } { x }"
+    },
+    {
+     "rep": 0,
+     "file": "05-rendu.png",
+     "reader": "p2t-mfr",
+     "ms": 2943,
+     "tokens": 21,
+     "raw": "\\sqrt { 1 8 } + ( \\frac { 2 } { 3 } ) ^ { 2 }",
+     "python": "\\sqrt { 1 8 } + ( \\frac { 2 } { 3 } ) ^ { 2 }"
+    },
+    {
+     "rep": 0,
+     "file": "05-rendu.png",
+     "reader": "p2t-mfr-1.5",
+     "ms": 3264,
+     "tokens": 25,
+     "raw": "\\sqrt { \\textbf { 1 8 } } + ( \\frac { 2 } { 3 } ) ^ { 2 }",
+     "python": "\\sqrt { \\textbf { 1 8 } } + ( \\frac { 2 } { 3 } ) ^ { 2 }"
+    },
+    {
+     "rep": 0,
+     "file": "06-rendu.png",
+     "reader": "p2t-mfr",
+     "ms": 3051,
+     "tokens": 22,
+     "raw": "f ( x ) = \\frac { \\operatorname { s i n } ( x ) } { x }",
+     "python": "f ( x ) = \\frac { \\operatorname { s i n } ( x ) } { x }"
+    },
+    {
+     "rep": 0,
+     "file": "06-rendu.png",
+     "reader": "p2t-mfr-1.5",
+     "ms": 3122,
+     "tokens": 22,
+     "raw": "f ( x ) = \\frac { \\operatorname { s i n } ( x ) } { x }",
+     "python": "f ( x ) = { \\frac { \\operatorname { s i n } ( x ) } { x } }"
+    },
+    {
+     "rep": 0,
+     "file": "07-rendu.png",
+     "reader": "p2t-mfr",
+     "ms": 2356,
+     "tokens": 12,
+     "raw": "x ^ { 2 } - 5 x + 6 = 0",
+     "python": "x ^ { 2 } - 5 x + 6 = 0"
+    },
+    {
+     "rep": 0,
+     "file": "07-rendu.png",
+     "reader": "p2t-mfr-1.5",
+     "ms": 2348,
+     "tokens": 12,
+     "raw": "x ^ { 2 } - 5 x + 6 = 0",
+     "python": "x ^ { 2 } - 5 x + 6 = 0"
+    },
+    {
+     "rep": 1,
+     "file": "00-rendu.png",
+     "reader": "p2t-mfr",
+     "ms": 1991,
+     "tokens": 7,
+     "raw": "3 x - 7 = 1 1",
+     "python": "3 x - 7 = 1 1"
+    },
+    {
+     "rep": 1,
+     "file": "00-rendu.png",
+     "reader": "p2t-mfr-1.5",
+     "ms": 2880,
+     "tokens": 19,
+     "raw": "\\mathbf { 3 } x - \\mathbf { 7 } = \\mathbf { 1 1 }",
+     "python": "\\mathbf { 3 } x - \\mathbf { 7 } = \\mathbf { 1 1 }"
+    },
+    {
+     "rep": 1,
+     "file": "00-photo.png",
+     "reader": "p2t-mfr",
+     "ms": 2010,
+     "tokens": 7,
+     "raw": "3 x - 7 = 1 1",
+     "python": "3 x - 7 = 1 1"
+    },
+    {
+     "rep": 1,
+     "file": "00-photo.png",
+     "reader": "p2t-mfr-1.5",
+     "ms": 1981,
+     "tokens": 7,
+     "raw": "3 x - 7 = 1 1",
+     "python": "3 x - 7 = 1 1"
+    },
+    {
+     "rep": 1,
+     "file": "01-rendu.png",
+     "reader": "p2t-mfr",
+     "ms": 2431,
+     "tokens": 13,
+     "raw": "2 x ^ { 2 } - 3 x - 5 = 0",
+     "python": "2 x ^ { 2 } - 3 x - 5 = 0"
+    },
+    {
+     "rep": 1,
+     "file": "01-rendu.png",
+     "reader": "p2t-mfr-1.5",
+     "ms": 2418,
+     "tokens": 13,
+     "raw": "2 x ^ { 2 } - 3 x - 5 = 0",
+     "python": "2 x ^ { 2 } - 3 x - 5 = 0"
+    },
+    {
+     "rep": 1,
+     "file": "01-photo.png",
+     "reader": "p2t-mfr",
+     "ms": 2445,
+     "tokens": 13,
+     "raw": "2 x ^ { 2 } - 3 x - 5 = 0",
+     "python": "2 x ^ { 2 } - 3 x - 5 = 0"
+    },
+    {
+     "rep": 1,
+     "file": "01-photo.png",
+     "reader": "p2t-mfr-1.5",
+     "ms": 2415,
+     "tokens": 13,
+     "raw": "2 x ^ { 2 } - 3 x - 5 = 0",
+     "python": "2 x ^ { 2 } - 3 x - 5 = 0"
+    },
+    {
+     "rep": 1,
+     "file": "02-rendu.png",
+     "reader": "p2t-mfr",
+     "ms": 2134,
+     "tokens": 9,
+     "raw": "\\frac 2 3 + \\frac 5 6",
+     "python": "\\frac 2 3 + \\frac 5 6"
+    },
+    {
+     "rep": 1,
+     "file": "02-rendu.png",
+     "reader": "p2t-mfr-1.5",
+     "ms": 2726,
+     "tokens": 17,
+     "raw": "\\frac { 2 } { 3 } + \\frac { 5 } { 6 }",
+     "python": "\\frac { 2 } { 3 } + \\frac { 5 } { 6 }"
+    },
+    {
+     "rep": 1,
+     "file": "02-photo.png",
+     "reader": "p2t-mfr",
+     "ms": 2738,
+     "tokens": 17,
+     "raw": "\\frac { 2 } { 3 } + \\frac { 5 } { 6 }",
+     "python": "\\frac { 2 } { 3 } + \\frac { 5 } { 6 }"
+    },
+    {
+     "rep": 1,
+     "file": "02-photo.png",
+     "reader": "p2t-mfr-1.5",
+     "ms": 2720,
+     "tokens": 17,
+     "raw": "\\frac { 2 } { 3 } + \\frac { 5 } { 6 }",
+     "python": "\\frac { 2 } { 3 } + \\frac { 5 } { 6 }"
+    },
+    {
+     "rep": 1,
+     "file": "03-rendu.png",
+     "reader": "p2t-mfr",
+     "ms": 2357,
+     "tokens": 12,
+     "raw": "\\int \\! x e ^ { x } \\, d x",
+     "python": "\\int \\! x e ^ { x } \\, d x"
+    },
+    {
+     "rep": 1,
+     "file": "03-rendu.png",
+     "reader": "p2t-mfr-1.5",
+     "ms": 2269,
+     "tokens": 11,
+     "raw": "\\int \\! x e ^ { x } d x",
+     "python": "\\int \\! x e ^ { x } d x"
+    },
+    {
+     "rep": 1,
+     "file": "04-rendu.png",
+     "reader": "p2t-mfr",
+     "ms": 3796,
+     "tokens": 30,
+     "raw": "\\operatorname* { l i m } _ { x \\to 0 } \\frac { \\operatorname { s i n } x } { x }",
+     "python": "\\operatorname* { l i m } _ { x \\to 0 } \\frac { \\operatorname { s i n } x } { x }"
+    },
+    {
+     "rep": 1,
+     "file": "04-rendu.png",
+     "reader": "p2t-mfr-1.5",
+     "ms": 4067,
+     "tokens": 33,
+     "raw": "\\underset { x \\to 0 } { \\operatorname* { l i m } } \\frac { \\operatorname { s i n } x } { x }",
+     "python": "\\underset { x \\to 0 } { \\operatorname* { l i m } } \\frac { \\operatorname { s i n } x } { x }"
+    },
+    {
+     "rep": 1,
+     "file": "04-photo.png",
+     "reader": "p2t-mfr",
+     "ms": 3377,
+     "tokens": 25,
+     "raw": "\\operatorname* { l i m } _ { x \\to 0 } \\frac { \\sin X } { x }",
+     "python": "\\operatorname* { l i m } _ { x \\to 0 } \\frac { \\sin X } { x }"
+    },
+    {
+     "rep": 1,
+     "file": "04-photo.png",
+     "reader": "p2t-mfr-1.5",
+     "ms": 4245,
+     "tokens": 35,
+     "raw": "\\underset { x \\to 0 } { \\operatorname* { l i m } } \\frac { \\operatorname { s i n } { x } } { x }",
+     "python": "\\operatorname* { l i m } _ { x \\to 0 } \\frac { \\operatorname { s i n } { x } } { x }"
+    },
+    {
+     "rep": 1,
+     "file": "05-rendu.png",
+     "reader": "p2t-mfr",
+     "ms": 3050,
+     "tokens": 21,
+     "raw": "\\sqrt { 1 8 } + ( \\frac { 2 } { 3 } ) ^ { 2 }",
+     "python": "\\sqrt { 1 8 } + ( \\frac { 2 } { 3 } ) ^ { 2 }"
+    },
+    {
+     "rep": 1,
+     "file": "05-rendu.png",
+     "reader": "p2t-mfr-1.5",
+     "ms": 3370,
+     "tokens": 25,
+     "raw": "\\sqrt { \\textbf { 1 8 } } + ( \\frac { 2 } { 3 } ) ^ { 2 }",
+     "python": "\\sqrt { \\textbf { 1 8 } } + ( \\frac { 2 } { 3 } ) ^ { 2 }"
+    },
+    {
+     "rep": 1,
+     "file": "06-rendu.png",
+     "reader": "p2t-mfr",
+     "ms": 3127,
+     "tokens": 22,
+     "raw": "f ( x ) = \\frac { \\operatorname { s i n } ( x ) } { x }",
+     "python": "f ( x ) = \\frac { \\operatorname { s i n } ( x ) } { x }"
+    },
+    {
+     "rep": 1,
+     "file": "06-rendu.png",
+     "reader": "p2t-mfr-1.5",
+     "ms": 3137,
+     "tokens": 22,
+     "raw": "f ( x ) = \\frac { \\operatorname { s i n } ( x ) } { x }",
+     "python": "f ( x ) = { \\frac { \\operatorname { s i n } ( x ) } { x } }"
+    },
+    {
+     "rep": 1,
+     "file": "07-rendu.png",
+     "reader": "p2t-mfr",
+     "ms": 2413,
+     "tokens": 12,
+     "raw": "x ^ { 2 } - 5 x + 6 = 0",
+     "python": "x ^ { 2 } - 5 x + 6 = 0"
+    },
+    {
+     "rep": 1,
+     "file": "07-rendu.png",
+     "reader": "p2t-mfr-1.5",
+     "ms": 2405,
+     "tokens": 12,
+     "raw": "x ^ { 2 } - 5 x + 6 = 0",
+     "python": "x ^ { 2 } - 5 x + 6 = 0"
+    },
+    {
+     "rep": 2,
+     "file": "00-rendu.png",
+     "reader": "p2t-mfr",
+     "ms": 2040,
+     "tokens": 7,
+     "raw": "3 x - 7 = 1 1",
+     "python": "3 x - 7 = 1 1"
+    },
+    {
+     "rep": 2,
+     "file": "00-rendu.png",
+     "reader": "p2t-mfr-1.5",
+     "ms": 2938,
+     "tokens": 19,
+     "raw": "\\mathbf { 3 } x - \\mathbf { 7 } = \\mathbf { 1 1 }",
+     "python": "\\mathbf { 3 } x - \\mathbf { 7 } = \\mathbf { 1 1 }"
+    },
+    {
+     "rep": 2,
+     "file": "00-photo.png",
+     "reader": "p2t-mfr",
+     "ms": 2001,
+     "tokens": 7,
+     "raw": "3 x - 7 = 1 1",
+     "python": "3 x - 7 = 1 1"
+    },
+    {
+     "rep": 2,
+     "file": "00-photo.png",
+     "reader": "p2t-mfr-1.5",
+     "ms": 1985,
+     "tokens": 7,
+     "raw": "3 x - 7 = 1 1",
+     "python": "3 x - 7 = 1 1"
+    },
+    {
+     "rep": 2,
+     "file": "01-rendu.png",
+     "reader": "p2t-mfr",
+     "ms": 2424,
+     "tokens": 13,
+     "raw": "2 x ^ { 2 } - 3 x - 5 = 0",
+     "python": "2 x ^ { 2 } - 3 x - 5 = 0"
+    },
+    {
+     "rep": 2,
+     "file": "01-rendu.png",
+     "reader": "p2t-mfr-1.5",
+     "ms": 2416,
+     "tokens": 13,
+     "raw": "2 x ^ { 2 } - 3 x - 5 = 0",
+     "python": "2 x ^ { 2 } - 3 x - 5 = 0"
+    },
+    {
+     "rep": 2,
+     "file": "01-photo.png",
+     "reader": "p2t-mfr",
+     "ms": 2442,
+     "tokens": 13,
+     "raw": "2 x ^ { 2 } - 3 x - 5 = 0",
+     "python": "2 x ^ { 2 } - 3 x - 5 = 0"
+    },
+    {
+     "rep": 2,
+     "file": "01-photo.png",
+     "reader": "p2t-mfr-1.5",
+     "ms": 2415,
+     "tokens": 13,
+     "raw": "2 x ^ { 2 } - 3 x - 5 = 0",
+     "python": "2 x ^ { 2 } - 3 x - 5 = 0"
+    },
+    {
+     "rep": 2,
+     "file": "02-rendu.png",
+     "reader": "p2t-mfr",
+     "ms": 2132,
+     "tokens": 9,
+     "raw": "\\frac 2 3 + \\frac 5 6",
+     "python": "\\frac 2 3 + \\frac 5 6"
+    },
+    {
+     "rep": 2,
+     "file": "02-rendu.png",
+     "reader": "p2t-mfr-1.5",
+     "ms": 2721,
+     "tokens": 17,
+     "raw": "\\frac { 2 } { 3 } + \\frac { 5 } { 6 }",
+     "python": "\\frac { 2 } { 3 } + \\frac { 5 } { 6 }"
+    },
+    {
+     "rep": 2,
+     "file": "02-photo.png",
+     "reader": "p2t-mfr",
+     "ms": 2864,
+     "tokens": 17,
+     "raw": "\\frac { 2 } { 3 } + \\frac { 5 } { 6 }",
+     "python": "\\frac { 2 } { 3 } + \\frac { 5 } { 6 }"
+    },
+    {
+     "rep": 2,
+     "file": "02-photo.png",
+     "reader": "p2t-mfr-1.5",
+     "ms": 2892,
+     "tokens": 17,
+     "raw": "\\frac { 2 } { 3 } + \\frac { 5 } { 6 }",
+     "python": "\\frac { 2 } { 3 } + \\frac { 5 } { 6 }"
+    },
+    {
+     "rep": 2,
+     "file": "03-rendu.png",
+     "reader": "p2t-mfr",
+     "ms": 2492,
+     "tokens": 12,
+     "raw": "\\int \\! x e ^ { x } \\, d x",
+     "python": "\\int \\! x e ^ { x } \\, d x"
+    },
+    {
+     "rep": 2,
+     "file": "03-rendu.png",
+     "reader": "p2t-mfr-1.5",
+     "ms": 2406,
+     "tokens": 11,
+     "raw": "\\int \\! x e ^ { x } d x",
+     "python": "\\int \\! x e ^ { x } d x"
+    },
+    {
+     "rep": 2,
+     "file": "04-rendu.png",
+     "reader": "p2t-mfr",
+     "ms": 3892,
+     "tokens": 30,
+     "raw": "\\operatorname* { l i m } _ { x \\to 0 } \\frac { \\operatorname { s i n } x } { x }",
+     "python": "\\operatorname* { l i m } _ { x \\to 0 } \\frac { \\operatorname { s i n } x } { x }"
+    },
+    {
+     "rep": 2,
+     "file": "04-rendu.png",
+     "reader": "p2t-mfr-1.5",
+     "ms": 4164,
+     "tokens": 33,
+     "raw": "\\underset { x \\to 0 } { \\operatorname* { l i m } } \\frac { \\operatorname { s i n } x } { x }",
+     "python": "\\underset { x \\to 0 } { \\operatorname* { l i m } } \\frac { \\operatorname { s i n } x } { x }"
+    },
+    {
+     "rep": 2,
+     "file": "04-photo.png",
+     "reader": "p2t-mfr",
+     "ms": 3515,
+     "tokens": 25,
+     "raw": "\\operatorname* { l i m } _ { x \\to 0 } \\frac { \\sin X } { x }",
+     "python": "\\operatorname* { l i m } _ { x \\to 0 } \\frac { \\sin X } { x }"
+    },
+    {
+     "rep": 2,
+     "file": "04-photo.png",
+     "reader": "p2t-mfr-1.5",
+     "ms": 4505,
+     "tokens": 35,
+     "raw": "\\underset { x \\to 0 } { \\operatorname* { l i m } } \\frac { \\operatorname { s i n } { x } } { x }",
+     "python": "\\operatorname* { l i m } _ { x \\to 0 } \\frac { \\operatorname { s i n } { x } } { x }"
+    },
+    {
+     "rep": 2,
+     "file": "05-rendu.png",
+     "reader": "p2t-mfr",
+     "ms": 3233,
+     "tokens": 21,
+     "raw": "\\sqrt { 1 8 } + ( \\frac { 2 } { 3 } ) ^ { 2 }",
+     "python": "\\sqrt { 1 8 } + ( \\frac { 2 } { 3 } ) ^ { 2 }"
+    },
+    {
+     "rep": 2,
+     "file": "05-rendu.png",
+     "reader": "p2t-mfr-1.5",
+     "ms": 3575,
+     "tokens": 25,
+     "raw": "\\sqrt { \\textbf { 1 8 } } + ( \\frac { 2 } { 3 } ) ^ { 2 }",
+     "python": "\\sqrt { \\textbf { 1 8 } } + ( \\frac { 2 } { 3 } ) ^ { 2 }"
+    },
+    {
+     "rep": 2,
+     "file": "06-rendu.png",
+     "reader": "p2t-mfr",
+     "ms": 3317,
+     "tokens": 22,
+     "raw": "f ( x ) = \\frac { \\operatorname { s i n } ( x ) } { x }",
+     "python": "f ( x ) = \\frac { \\operatorname { s i n } ( x ) } { x }"
+    },
+    {
+     "rep": 2,
+     "file": "06-rendu.png",
+     "reader": "p2t-mfr-1.5",
+     "ms": 3312,
+     "tokens": 22,
+     "raw": "f ( x ) = \\frac { \\operatorname { s i n } ( x ) } { x }",
+     "python": "f ( x ) = { \\frac { \\operatorname { s i n } ( x ) } { x } }"
+    },
+    {
+     "rep": 2,
+     "file": "07-rendu.png",
+     "reader": "p2t-mfr",
+     "ms": 2419,
+     "tokens": 12,
+     "raw": "x ^ { 2 } - 5 x + 6 = 0",
+     "python": "x ^ { 2 } - 5 x + 6 = 0"
+    },
+    {
+     "rep": 2,
+     "file": "07-rendu.png",
+     "reader": "p2t-mfr-1.5",
+     "ms": 2399,
+     "tokens": 12,
+     "raw": "x ^ { 2 } - 5 x + 6 = 0",
+     "python": "x ^ { 2 } - 5 x + 6 = 0"
+    }
+   ],
+   "loadMs": 3597
+  },
+  {
+   "variant": "fp32",
+   "reps": 3,
+   "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Mobile Safari/537.36",
+   "runs": [
+    {
+     "rep": 0,
+     "file": "00-rendu.png",
+     "reader": "p2t-mfr",
+     "ms": 1857,
+     "tokens": 7,
+     "raw": "3 x - 7 = 1 1",
+     "python": "3 x - 7 = 1 1"
+    },
+    {
+     "rep": 0,
+     "file": "00-rendu.png",
+     "reader": "p2t-mfr-1.5",
+     "ms": 2655,
+     "tokens": 19,
+     "raw": "\\mathbf { 3 } x - \\mathbf { 7 } = \\mathbf { 1 1 }",
+     "python": "\\mathbf { 3 } x - \\mathbf { 7 } = \\mathbf { 1 1 }"
+    },
+    {
+     "rep": 0,
+     "file": "00-photo.png",
+     "reader": "p2t-mfr",
+     "ms": 1829,
+     "tokens": 7,
+     "raw": "3 x - 7 = 1 1",
+     "python": "3 x - 7 = 1 1"
+    },
+    {
+     "rep": 0,
+     "file": "00-photo.png",
+     "reader": "p2t-mfr-1.5",
+     "ms": 1824,
+     "tokens": 7,
+     "raw": "3 x - 7 = 1 1",
+     "python": "3 x - 7 = 1 1"
+    },
+    {
+     "rep": 0,
+     "file": "01-rendu.png",
+     "reader": "p2t-mfr",
+     "ms": 2214,
+     "tokens": 13,
+     "raw": "2 x ^ { 2 } - 3 x - 5 = 0",
+     "python": "2 x ^ { 2 } - 3 x - 5 = 0"
+    },
+    {
+     "rep": 0,
+     "file": "01-rendu.png",
+     "reader": "p2t-mfr-1.5",
+     "ms": 2215,
+     "tokens": 13,
+     "raw": "2 x ^ { 2 } - 3 x - 5 = 0",
+     "python": "2 x ^ { 2 } - 3 x - 5 = 0"
+    },
+    {
+     "rep": 0,
+     "file": "01-photo.png",
+     "reader": "p2t-mfr",
+     "ms": 2225,
+     "tokens": 13,
+     "raw": "2 x ^ { 2 } - 3 x - 5 = 0",
+     "python": "2 x ^ { 2 } - 3 x - 5 = 0"
+    },
+    {
+     "rep": 0,
+     "file": "01-photo.png",
+     "reader": "p2t-mfr-1.5",
+     "ms": 2234,
+     "tokens": 13,
+     "raw": "2 x ^ { 2 } - 3 x - 5 = 0",
+     "python": "2 x ^ { 2 } - 3 x - 5 = 0"
+    },
+    {
+     "rep": 0,
+     "file": "02-rendu.png",
+     "reader": "p2t-mfr",
+     "ms": 2010,
+     "tokens": 9,
+     "raw": "\\frac 2 3 + \\frac 5 6",
+     "python": "\\frac 2 3 + \\frac 5 6"
+    },
+    {
+     "rep": 0,
+     "file": "02-rendu.png",
+     "reader": "p2t-mfr-1.5",
+     "ms": 2575,
+     "tokens": 17,
+     "raw": "\\frac { 2 } { 3 } + \\frac { 5 } { 6 }",
+     "python": "\\frac { 2 } { 3 } + \\frac { 5 } { 6 }"
+    },
+    {
+     "rep": 0,
+     "file": "02-photo.png",
+     "reader": "p2t-mfr",
+     "ms": 2576,
+     "tokens": 17,
+     "raw": "\\frac { 2 } { 3 } + \\frac { 5 } { 6 }",
+     "python": "\\frac { 2 } { 3 } + \\frac { 5 } { 6 }"
+    },
+    {
+     "rep": 0,
+     "file": "02-photo.png",
+     "reader": "p2t-mfr-1.5",
+     "ms": 2605,
+     "tokens": 17,
+     "raw": "\\frac { 2 } { 3 } + \\frac { 5 } { 6 }",
+     "python": "\\frac { 2 } { 3 } + \\frac { 5 } { 6 }"
+    },
+    {
+     "rep": 0,
+     "file": "03-rendu.png",
+     "reader": "p2t-mfr",
+     "ms": 2395,
+     "tokens": 12,
+     "raw": "\\int \\! x e ^ { x } \\, d x",
+     "python": "\\int \\! x e ^ { x } \\, d x"
+    },
+    {
+     "rep": 0,
+     "file": "03-rendu.png",
+     "reader": "p2t-mfr-1.5",
+     "ms": 2326,
+     "tokens": 11,
+     "raw": "\\int \\! x e ^ { x } d x",
+     "python": "\\int \\! x e ^ { x } d x"
+    },
+    {
+     "rep": 0,
+     "file": "04-rendu.png",
+     "reader": "p2t-mfr",
+     "ms": 3860,
+     "tokens": 30,
+     "raw": "\\operatorname* { l i m } _ { x \\to 0 } \\frac { \\operatorname { s i n } x } { x }",
+     "python": "\\operatorname* { l i m } _ { x \\to 0 } \\frac { \\operatorname { s i n } x } { x }"
+    },
+    {
+     "rep": 0,
+     "file": "04-rendu.png",
+     "reader": "p2t-mfr-1.5",
+     "ms": 4041,
+     "tokens": 33,
+     "raw": "\\underset { x \\to 0 } { \\operatorname* { l i m } } \\frac { \\operatorname { s i n } x } { x }",
+     "python": "\\underset { x \\to 0 } { \\operatorname* { l i m } } \\frac { \\operatorname { s i n } x } { x }"
+    },
+    {
+     "rep": 0,
+     "file": "04-photo.png",
+     "reader": "p2t-mfr",
+     "ms": 3505,
+     "tokens": 27,
+     "raw": "\\operatorname* { l i m } _ { x \\to 0 } { \\frac { \\sin X } { x } }",
+     "python": "\\operatorname* { l i m } _ { x \\to 0 } \\frac { \\sin X } { x }"
+    },
+    {
+     "rep": 0,
+     "file": "04-photo.png",
+     "reader": "p2t-mfr-1.5",
+     "ms": 4209,
+     "tokens": 35,
+     "raw": "\\underset { x \\to 0 } { \\operatorname* { l i m } } \\frac { \\operatorname { s i n } { x } } { x }",
+     "python": "\\operatorname* { l i m } _ { x \\to 0 } \\frac { \\operatorname { s i n } { x } } { x }"
+    },
+    {
+     "rep": 0,
+     "file": "05-rendu.png",
+     "reader": "p2t-mfr",
+     "ms": 3101,
+     "tokens": 21,
+     "raw": "\\sqrt { 1 8 } + ( \\frac { 2 } { 3 } ) ^ { 2 }",
+     "python": "\\sqrt { 1 8 } + ( \\frac { 2 } { 3 } ) ^ { 2 }"
+    },
+    {
+     "rep": 0,
+     "file": "05-rendu.png",
+     "reader": "p2t-mfr-1.5",
+     "ms": 3437,
+     "tokens": 25,
+     "raw": "\\sqrt { \\textbf { 1 8 } } + ( \\frac { 2 } { 3 } ) ^ { 2 }",
+     "python": "\\sqrt { \\textbf { 1 8 } } + ( \\frac { 2 } { 3 } ) ^ { 2 }"
+    },
+    {
+     "rep": 0,
+     "file": "06-rendu.png",
+     "reader": "p2t-mfr",
+     "ms": 3175,
+     "tokens": 22,
+     "raw": "f ( x ) = \\frac { \\operatorname { s i n } ( x ) } { x }",
+     "python": "f ( x ) = \\frac { \\operatorname { s i n } ( x ) } { x }"
+    },
+    {
+     "rep": 0,
+     "file": "06-rendu.png",
+     "reader": "p2t-mfr-1.5",
+     "ms": 3185,
+     "tokens": 22,
+     "raw": "f ( x ) = \\frac { \\operatorname { s i n } ( x ) } { x }",
+     "python": "f ( x ) = { \\frac { \\operatorname { s i n } ( x ) } { x } }"
+    },
+    {
+     "rep": 0,
+     "file": "07-rendu.png",
+     "reader": "p2t-mfr",
+     "ms": 2396,
+     "tokens": 12,
+     "raw": "x ^ { 2 } - 5 x + 6 = 0",
+     "python": "x ^ { 2 } - 5 x + 6 = 0"
+    },
+    {
+     "rep": 0,
+     "file": "07-rendu.png",
+     "reader": "p2t-mfr-1.5",
+     "ms": 2400,
+     "tokens": 12,
+     "raw": "x ^ { 2 } - 5 x + 6 = 0",
+     "python": "x ^ { 2 } - 5 x + 6 = 0"
+    },
+    {
+     "rep": 1,
+     "file": "00-rendu.png",
+     "reader": "p2t-mfr",
+     "ms": 2024,
+     "tokens": 7,
+     "raw": "3 x - 7 = 1 1",
+     "python": "3 x - 7 = 1 1"
+    },
+    {
+     "rep": 1,
+     "file": "00-rendu.png",
+     "reader": "p2t-mfr-1.5",
+     "ms": 2941,
+     "tokens": 19,
+     "raw": "\\mathbf { 3 } x - \\mathbf { 7 } = \\mathbf { 1 1 }",
+     "python": "\\mathbf { 3 } x - \\mathbf { 7 } = \\mathbf { 1 1 }"
+    },
+    {
+     "rep": 1,
+     "file": "00-photo.png",
+     "reader": "p2t-mfr",
+     "ms": 2032,
+     "tokens": 7,
+     "raw": "3 x - 7 = 1 1",
+     "python": "3 x - 7 = 1 1"
+    },
+    {
+     "rep": 1,
+     "file": "00-photo.png",
+     "reader": "p2t-mfr-1.5",
+     "ms": 2030,
+     "tokens": 7,
+     "raw": "3 x - 7 = 1 1",
+     "python": "3 x - 7 = 1 1"
+    },
+    {
+     "rep": 1,
+     "file": "01-rendu.png",
+     "reader": "p2t-mfr",
+     "ms": 2474,
+     "tokens": 13,
+     "raw": "2 x ^ { 2 } - 3 x - 5 = 0",
+     "python": "2 x ^ { 2 } - 3 x - 5 = 0"
+    },
+    {
+     "rep": 1,
+     "file": "01-rendu.png",
+     "reader": "p2t-mfr-1.5",
+     "ms": 2470,
+     "tokens": 13,
+     "raw": "2 x ^ { 2 } - 3 x - 5 = 0",
+     "python": "2 x ^ { 2 } - 3 x - 5 = 0"
+    },
+    {
+     "rep": 1,
+     "file": "01-photo.png",
+     "reader": "p2t-mfr",
+     "ms": 2478,
+     "tokens": 13,
+     "raw": "2 x ^ { 2 } - 3 x - 5 = 0",
+     "python": "2 x ^ { 2 } - 3 x - 5 = 0"
+    },
+    {
+     "rep": 1,
+     "file": "01-photo.png",
+     "reader": "p2t-mfr-1.5",
+     "ms": 2462,
+     "tokens": 13,
+     "raw": "2 x ^ { 2 } - 3 x - 5 = 0",
+     "python": "2 x ^ { 2 } - 3 x - 5 = 0"
+    },
+    {
+     "rep": 1,
+     "file": "02-rendu.png",
+     "reader": "p2t-mfr",
+     "ms": 2169,
+     "tokens": 9,
+     "raw": "\\frac 2 3 + \\frac 5 6",
+     "python": "\\frac 2 3 + \\frac 5 6"
+    },
+    {
+     "rep": 1,
+     "file": "02-rendu.png",
+     "reader": "p2t-mfr-1.5",
+     "ms": 2911,
+     "tokens": 17,
+     "raw": "\\frac { 2 } { 3 } + \\frac { 5 } { 6 }",
+     "python": "\\frac { 2 } { 3 } + \\frac { 5 } { 6 }"
+    },
+    {
+     "rep": 1,
+     "file": "02-photo.png",
+     "reader": "p2t-mfr",
+     "ms": 2906,
+     "tokens": 17,
+     "raw": "\\frac { 2 } { 3 } + \\frac { 5 } { 6 }",
+     "python": "\\frac { 2 } { 3 } + \\frac { 5 } { 6 }"
+    },
+    {
+     "rep": 1,
+     "file": "02-photo.png",
+     "reader": "p2t-mfr-1.5",
+     "ms": 2901,
+     "tokens": 17,
+     "raw": "\\frac { 2 } { 3 } + \\frac { 5 } { 6 }",
+     "python": "\\frac { 2 } { 3 } + \\frac { 5 } { 6 }"
+    },
+    {
+     "rep": 1,
+     "file": "03-rendu.png",
+     "reader": "p2t-mfr",
+     "ms": 2503,
+     "tokens": 12,
+     "raw": "\\int \\! x e ^ { x } \\, d x",
+     "python": "\\int \\! x e ^ { x } \\, d x"
+    },
+    {
+     "rep": 1,
+     "file": "03-rendu.png",
+     "reader": "p2t-mfr-1.5",
+     "ms": 2423,
+     "tokens": 11,
+     "raw": "\\int \\! x e ^ { x } d x",
+     "python": "\\int \\! x e ^ { x } d x"
+    },
+    {
+     "rep": 1,
+     "file": "04-rendu.png",
+     "reader": "p2t-mfr",
+     "ms": 4029,
+     "tokens": 30,
+     "raw": "\\operatorname* { l i m } _ { x \\to 0 } \\frac { \\operatorname { s i n } x } { x }",
+     "python": "\\operatorname* { l i m } _ { x \\to 0 } \\frac { \\operatorname { s i n } x } { x }"
+    },
+    {
+     "rep": 1,
+     "file": "04-rendu.png",
+     "reader": "p2t-mfr-1.5",
+     "ms": 4324,
+     "tokens": 33,
+     "raw": "\\underset { x \\to 0 } { \\operatorname* { l i m } } \\frac { \\operatorname { s i n } x } { x }",
+     "python": "\\underset { x \\to 0 } { \\operatorname* { l i m } } \\frac { \\operatorname { s i n } x } { x }"
+    },
+    {
+     "rep": 1,
+     "file": "04-photo.png",
+     "reader": "p2t-mfr",
+     "ms": 3763,
+     "tokens": 27,
+     "raw": "\\operatorname* { l i m } _ { x \\to 0 } { \\frac { \\sin X } { x } }",
+     "python": "\\operatorname* { l i m } _ { x \\to 0 } \\frac { \\sin X } { x }"
+    },
+    {
+     "rep": 1,
+     "file": "04-photo.png",
+     "reader": "p2t-mfr-1.5",
+     "ms": 4524,
+     "tokens": 35,
+     "raw": "\\underset { x \\to 0 } { \\operatorname* { l i m } } \\frac { \\operatorname { s i n } { x } } { x }",
+     "python": "\\operatorname* { l i m } _ { x \\to 0 } \\frac { \\operatorname { s i n } { x } } { x }"
+    },
+    {
+     "rep": 1,
+     "file": "05-rendu.png",
+     "reader": "p2t-mfr",
+     "ms": 3236,
+     "tokens": 21,
+     "raw": "\\sqrt { 1 8 } + ( \\frac { 2 } { 3 } ) ^ { 2 }",
+     "python": "\\sqrt { 1 8 } + ( \\frac { 2 } { 3 } ) ^ { 2 }"
+    },
+    {
+     "rep": 1,
+     "file": "05-rendu.png",
+     "reader": "p2t-mfr-1.5",
+     "ms": 3599,
+     "tokens": 25,
+     "raw": "\\sqrt { \\textbf { 1 8 } } + ( \\frac { 2 } { 3 } ) ^ { 2 }",
+     "python": "\\sqrt { \\textbf { 1 8 } } + ( \\frac { 2 } { 3 } ) ^ { 2 }"
+    },
+    {
+     "rep": 1,
+     "file": "06-rendu.png",
+     "reader": "p2t-mfr",
+     "ms": 3318,
+     "tokens": 22,
+     "raw": "f ( x ) = \\frac { \\operatorname { s i n } ( x ) } { x }",
+     "python": "f ( x ) = \\frac { \\operatorname { s i n } ( x ) } { x }"
+    },
+    {
+     "rep": 1,
+     "file": "06-rendu.png",
+     "reader": "p2t-mfr-1.5",
+     "ms": 3327,
+     "tokens": 22,
+     "raw": "f ( x ) = \\frac { \\operatorname { s i n } ( x ) } { x }",
+     "python": "f ( x ) = { \\frac { \\operatorname { s i n } ( x ) } { x } }"
+    },
+    {
+     "rep": 1,
+     "file": "07-rendu.png",
+     "reader": "p2t-mfr",
+     "ms": 2510,
+     "tokens": 12,
+     "raw": "x ^ { 2 } - 5 x + 6 = 0",
+     "python": "x ^ { 2 } - 5 x + 6 = 0"
+    },
+    {
+     "rep": 1,
+     "file": "07-rendu.png",
+     "reader": "p2t-mfr-1.5",
+     "ms": 2513,
+     "tokens": 12,
+     "raw": "x ^ { 2 } - 5 x + 6 = 0",
+     "python": "x ^ { 2 } - 5 x + 6 = 0"
+    },
+    {
+     "rep": 2,
+     "file": "00-rendu.png",
+     "reader": "p2t-mfr",
+     "ms": 2126,
+     "tokens": 7,
+     "raw": "3 x - 7 = 1 1",
+     "python": "3 x - 7 = 1 1"
+    },
+    {
+     "rep": 2,
+     "file": "00-rendu.png",
+     "reader": "p2t-mfr-1.5",
+     "ms": 3076,
+     "tokens": 19,
+     "raw": "\\mathbf { 3 } x - \\mathbf { 7 } = \\mathbf { 1 1 }",
+     "python": "\\mathbf { 3 } x - \\mathbf { 7 } = \\mathbf { 1 1 }"
+    },
+    {
+     "rep": 2,
+     "file": "00-photo.png",
+     "reader": "p2t-mfr",
+     "ms": 2129,
+     "tokens": 7,
+     "raw": "3 x - 7 = 1 1",
+     "python": "3 x - 7 = 1 1"
+    },
+    {
+     "rep": 2,
+     "file": "00-photo.png",
+     "reader": "p2t-mfr-1.5",
+     "ms": 2125,
+     "tokens": 7,
+     "raw": "3 x - 7 = 1 1",
+     "python": "3 x - 7 = 1 1"
+    },
+    {
+     "rep": 2,
+     "file": "01-rendu.png",
+     "reader": "p2t-mfr",
+     "ms": 2589,
+     "tokens": 13,
+     "raw": "2 x ^ { 2 } - 3 x - 5 = 0",
+     "python": "2 x ^ { 2 } - 3 x - 5 = 0"
+    },
+    {
+     "rep": 2,
+     "file": "01-rendu.png",
+     "reader": "p2t-mfr-1.5",
+     "ms": 2590,
+     "tokens": 13,
+     "raw": "2 x ^ { 2 } - 3 x - 5 = 0",
+     "python": "2 x ^ { 2 } - 3 x - 5 = 0"
+    },
+    {
+     "rep": 2,
+     "file": "01-photo.png",
+     "reader": "p2t-mfr",
+     "ms": 2587,
+     "tokens": 13,
+     "raw": "2 x ^ { 2 } - 3 x - 5 = 0",
+     "python": "2 x ^ { 2 } - 3 x - 5 = 0"
+    },
+    {
+     "rep": 2,
+     "file": "01-photo.png",
+     "reader": "p2t-mfr-1.5",
+     "ms": 2590,
+     "tokens": 13,
+     "raw": "2 x ^ { 2 } - 3 x - 5 = 0",
+     "python": "2 x ^ { 2 } - 3 x - 5 = 0"
+    },
+    {
+     "rep": 2,
+     "file": "02-rendu.png",
+     "reader": "p2t-mfr",
+     "ms": 2214,
+     "tokens": 9,
+     "raw": "\\frac 2 3 + \\frac 5 6",
+     "python": "\\frac 2 3 + \\frac 5 6"
+    },
+    {
+     "rep": 2,
+     "file": "02-rendu.png",
+     "reader": "p2t-mfr-1.5",
+     "ms": 2780,
+     "tokens": 17,
+     "raw": "\\frac { 2 } { 3 } + \\frac { 5 } { 6 }",
+     "python": "\\frac { 2 } { 3 } + \\frac { 5 } { 6 }"
+    },
+    {
+     "rep": 2,
+     "file": "02-photo.png",
+     "reader": "p2t-mfr",
+     "ms": 2769,
+     "tokens": 17,
+     "raw": "\\frac { 2 } { 3 } + \\frac { 5 } { 6 }",
+     "python": "\\frac { 2 } { 3 } + \\frac { 5 } { 6 }"
+    },
+    {
+     "rep": 2,
+     "file": "02-photo.png",
+     "reader": "p2t-mfr-1.5",
+     "ms": 2773,
+     "tokens": 17,
+     "raw": "\\frac { 2 } { 3 } + \\frac { 5 } { 6 }",
+     "python": "\\frac { 2 } { 3 } + \\frac { 5 } { 6 }"
+    },
+    {
+     "rep": 2,
+     "file": "03-rendu.png",
+     "reader": "p2t-mfr",
+     "ms": 2388,
+     "tokens": 12,
+     "raw": "\\int \\! x e ^ { x } \\, d x",
+     "python": "\\int \\! x e ^ { x } \\, d x"
+    },
+    {
+     "rep": 2,
+     "file": "03-rendu.png",
+     "reader": "p2t-mfr-1.5",
+     "ms": 2323,
+     "tokens": 11,
+     "raw": "\\int \\! x e ^ { x } d x",
+     "python": "\\int \\! x e ^ { x } d x"
+    },
+    {
+     "rep": 2,
+     "file": "04-rendu.png",
+     "reader": "p2t-mfr",
+     "ms": 3849,
+     "tokens": 30,
+     "raw": "\\operatorname* { l i m } _ { x \\to 0 } \\frac { \\operatorname { s i n } x } { x }",
+     "python": "\\operatorname* { l i m } _ { x \\to 0 } \\frac { \\operatorname { s i n } x } { x }"
+    },
+    {
+     "rep": 2,
+     "file": "04-rendu.png",
+     "reader": "p2t-mfr-1.5",
+     "ms": 4135,
+     "tokens": 33,
+     "raw": "\\underset { x \\to 0 } { \\operatorname* { l i m } } \\frac { \\operatorname { s i n } x } { x }",
+     "python": "\\underset { x \\to 0 } { \\operatorname* { l i m } } \\frac { \\operatorname { s i n } x } { x }"
+    },
+    {
+     "rep": 2,
+     "file": "04-photo.png",
+     "reader": "p2t-mfr",
+     "ms": 3601,
+     "tokens": 27,
+     "raw": "\\operatorname* { l i m } _ { x \\to 0 } { \\frac { \\sin X } { x } }",
+     "python": "\\operatorname* { l i m } _ { x \\to 0 } \\frac { \\sin X } { x }"
+    },
+    {
+     "rep": 2,
+     "file": "04-photo.png",
+     "reader": "p2t-mfr-1.5",
+     "ms": 4329,
+     "tokens": 35,
+     "raw": "\\underset { x \\to 0 } { \\operatorname* { l i m } } \\frac { \\operatorname { s i n } { x } } { x }",
+     "python": "\\operatorname* { l i m } _ { x \\to 0 } \\frac { \\operatorname { s i n } { x } } { x }"
+    },
+    {
+     "rep": 2,
+     "file": "05-rendu.png",
+     "reader": "p2t-mfr",
+     "ms": 3232,
+     "tokens": 21,
+     "raw": "\\sqrt { 1 8 } + ( \\frac { 2 } { 3 } ) ^ { 2 }",
+     "python": "\\sqrt { 1 8 } + ( \\frac { 2 } { 3 } ) ^ { 2 }"
+    },
+    {
+     "rep": 2,
+     "file": "05-rendu.png",
+     "reader": "p2t-mfr-1.5",
+     "ms": 3591,
+     "tokens": 25,
+     "raw": "\\sqrt { \\textbf { 1 8 } } + ( \\frac { 2 } { 3 } ) ^ { 2 }",
+     "python": "\\sqrt { \\textbf { 1 8 } } + ( \\frac { 2 } { 3 } ) ^ { 2 }"
+    },
+    {
+     "rep": 2,
+     "file": "06-rendu.png",
+     "reader": "p2t-mfr",
+     "ms": 3321,
+     "tokens": 22,
+     "raw": "f ( x ) = \\frac { \\operatorname { s i n } ( x ) } { x }",
+     "python": "f ( x ) = \\frac { \\operatorname { s i n } ( x ) } { x }"
+    },
+    {
+     "rep": 2,
+     "file": "06-rendu.png",
+     "reader": "p2t-mfr-1.5",
+     "ms": 3324,
+     "tokens": 22,
+     "raw": "f ( x ) = \\frac { \\operatorname { s i n } ( x ) } { x }",
+     "python": "f ( x ) = { \\frac { \\operatorname { s i n } ( x ) } { x } }"
+    },
+    {
+     "rep": 2,
+     "file": "07-rendu.png",
+     "reader": "p2t-mfr",
+     "ms": 2500,
+     "tokens": 12,
+     "raw": "x ^ { 2 } - 5 x + 6 = 0",
+     "python": "x ^ { 2 } - 5 x + 6 = 0"
+    },
+    {
+     "rep": 2,
+     "file": "07-rendu.png",
+     "reader": "p2t-mfr-1.5",
+     "ms": 2504,
+     "tokens": 12,
+     "raw": "x ^ { 2 } - 5 x + 6 = 0",
+     "python": "x ^ { 2 } - 5 x + 6 = 0"
+    }
+   ],
+   "loadMs": 8614
+  }
+ ]
+}

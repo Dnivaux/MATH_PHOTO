@@ -203,21 +203,87 @@ Objectif : un OCR bien meilleur sur papier, écran et manuscrit, côté téléph
 Vote du téléphone : accord sur 205 images sur 300, dont 192 justes (contre 100 % sur l'imprimé synthétique).
 Chaîne actuelle (accord → téléphone, sinon serveur) : 94,7 % ; hors connexion : 78 %.
 
+## Grilles « embarqué » et « MLOps » : ce qui manquait (7 novembre, soir)
+
+### Embarqué, niveau 2 : quantifié contre non quantifié, mesuré sur la cible (S24 Ultra, Snapdragon 8 Gen 3)
+
+Précision : runs `gguf-*-t03-gpu` (même GGUF, T = 0,3, 3 niveaux). Vitesse et RAM : `make device-llm`
+(`eval/device_kernels.py`, llama-bench Android par adb, réglages de l'app : 4 fils, CPU, lots de 256), run
+`device-llm-s24-ultra`, détail dans `eval/results/device-llm-s24-ultra.json`. Temps d'une explication estimé pour
+un prompt de 250 jetons et 157 jetons générés.
+
+| GGUF | Acceptation collège / lycée / sup. | Fichier | RAM en pic | Prompt | Génération | Explication |
+|---|---|---|---|---|---|---|
+| Non prunée F16 | 96,4 / 94,4 / 99,2 | 1 192 Mo | 1 228 Mo | 25 tok/s | 14,4 tok/s | ~20,7 s |
+| Non prunée Q8_0 | 96,4 / 95,2 / 99,2 | 634 Mo | 1 296 Mo | 437 tok/s | 61,0 tok/s | ~3,1 s |
+| **Non prunée Q4_K_M (champion)** | 94,8 / 94,4 / 98,8 | 391 Mo | 835 Mo | 286 tok/s | 65,9 tok/s | ~3,3 s |
+| Prunée F16 | 90,8 / 94,0 / 98,0 | 1 003 Mo | 1 041 Mo | 30 tok/s | 16,1 tok/s | ~18,1 s |
+| Prunée Q8_0 | 92,0 / 95,2 / 98,4 | 533 Mo | 1 097 Mo | 559 tok/s | 74,5 tok/s | ~2,6 s |
+| Prunée Q4_K_M | 82,0 / 92,4 / 98,0 | 333 Mo | 718 Mo | 330 tok/s | 73,1 tok/s | ~2,9 s |
+
+- F16 est inutilisable sur le téléphone (6 à 7 fois plus lent) : la quantization est indispensable, pas un bonus.
+- Q8_0 et Q4_K_M ont la même vitesse de bout en bout (noyaux int8 / i8mm de l'ARM pour le prompt) ; Q8_0 gagne
+  1,6 pt au collège, mais coûte +243 Mo à télécharger et +460 Mo de RAM (poids réarrangés pour l'ARM).
+- La prunée gagne ~10 % de vitesse mais perd jusqu'à 12,8 pts au collège en Q4 : pas rentable.
+- **Décision à prendre** : garder Q4_K_M (taille, RAM partagée avec l'OCR et la WebView, téléphones à 8 Go) ou
+  promouvoir Q8_0 (meilleure précision au même temps sur un haut de gamme).
+
+OCR (`make device-ocr` : page `clients/mobile/scripts/engine-harness/bench.html` dans Chrome sur le téléphone, même
+code onnxruntime-web WASM que la WebView ; 12 images × 3 passes ; run `device-ocr-s24-ultra`) :
+
+| pix2text-mfr | Fichiers | Chargement (2 lecteurs) | Lecture p50 v1 / 1.5 | Les deux lecteurs | PC (Chromium) v1 |
+|---|---|---|---|---|---|
+| FP32 | 2 × 113 Mo | 8,6 s | 2,55 / 2,84 s | 5,2 s | 1,00 s |
+| **INT8** | 2 × 31 Mo | 3,6 s | 2,44 / 2,72 s | 4,9 s | 0,68 s |
+
+Sur le téléphone, l'INT8 ne gagne que 4 % de temps de lecture (32 % sur PC) : WASM sur un seul fil, sans noyau int8
+efficace sur ARM. Son gain est la taille (÷ 3,7) et le chargement (÷ 2,4), à précision égale (95,7 % contre 95,3 %).
+**Constat** : ~5 s pour les deux lecteurs, l'OCR est le poste le plus lent de l'app. Pistes : cache KV du décodeur
+(aujourd'hui une passe complète par jeton), ORT natif (onnxruntime-react-native, XNNPACK) au lieu du WASM, ou un
+seul lecteur quand sa confiance est haute.
+
+### MLOps, niveau 1 et 2 : VM créée par OpenTofu, déploiement continu
+
+- `make vm-prepare && make vm-up` : VM Ubuntu 24.04 (8 vCPU, 12 Go) créée par OpenTofu sur libvirt, Docker, dépôt
+  cloné, stack en profil `ci`, runner GitHub auto-hébergé (`photo-maths-staging`, en ligne).
+- `deploy.yml` (run 42401292218) : commit testé, stack reconstruite, vérification (santé + résolution de
+  `-3x²+23x-30=0` → `x ∈ {5/3 ; 6}`) : **succès**. Le retour arrière a aussi été vu en vrai sur les deux échecs
+  d'avant.
+- Corrections : écran SPICE absent de `qemu-base` (VNC local), pare-feu `ufw` + `FORWARD` de Docker (README),
+  `SANDBOX_CPUS=8` > 4 vCPU (VM à 8 vCPU), `data/` créé par Docker en root, `build_sets` sans pandas
+  (`--no-mlflow`). Les deux derniers sont dans `deploy.yml` et `cloud-init` : **à pousser** pour que le prochain
+  déploiement automatique les prenne.
+
+### MLOps, niveau 1 : test de charge en production (VM de staging)
+
+`LOAD_SKIP=ocr,models make load-test HOST=http://192.168.122.171:8100 ENV=staging USERS="1 4 8 16 32 64"`
+(runs `load-staging-*u`). Profil `ci` : faux LLM, donc on mesure la gateway, l'authentification, l'usage en
+Postgres et le bac à sable qui exécute et vérifie le code ; OCR serveur et registry absents de la VM.
+
+| Utilisateurs | req/s | Échecs | p50 | p95 | p99 |
+|---|---|---|---|---|---|
+| 1 | 0,4 | 0 % | 260 ms | 340 ms | 340 ms |
+| 8 | 3,0 | 0 % | 260 ms | 330 ms | 410 ms |
+| 16 | 5,9 | 0 % | 270 ms | 350 ms | 430 ms |
+| 32 | 11,1 | 0 % | 280 ms | 450 ms | 690 ms |
+| 64 | 21,1 | 0 % | 450 ms | 1 300 ms | 2 100 ms |
+
+Capacité : au moins 64 utilisateurs simultanés sous le budget (p95 ≤ 5 s), 0 échec sur 2 533 requêtes. La latence
+décolle à 64 (bac à sable sur 8 vCPU). Sur le PC avec le vrai 7B : 64 utilisateurs, 16,6 req/s, p95 1,7 s.
+
 ## Suite
 
 Relancer : `make up` (tout), ou `make infra-up` seul pour entraîner. Gateway sur :8100, jeton `dev-token`.
 
-### Priorité 1
-1. Pointer l'app sur la gateway du PC (`make up`, puis `http://<ip-du-PC>:8100` dans Réglages) et tester avec une vraie photo.
-2. Mesures sur le téléphone (`eval/device_bench.py`) : non prunée (champion) et prunée, Q4_K_M et Q8_0.
-3. Photos de la planche (`data/ocr/real/planche_a_imprimer.pdf`, 50 formules) → `eval/ocr_bench.py` sur `data/ocr/real`,
-   calibration du seuil de confiance (0,9 laisse passer des lectures fausses).
-4. OCR : tester sur le téléphone (temps des deux lecteurs, vote). Élargir le générateur de limites (suites, x→0⁺,
-   ln, exp, racines).
+### Priorité 1 : soutenance
+1. Présentation : les deux grilles critère par critère (section « Grilles » ci-dessus, `docs/BILAN_MODELES_ET_APP.md`).
+2. Décider du champion de l'explicateur : Q4_K_M (actuel) ou Q8_0 (voir le tableau mesuré sur le S24 Ultra).
+3. Pousser `deploy.yml` / `cloud-init` corrigés, puis vérifier que le déploiement automatique part seul après la CI.
 
-### Priorité 2 (grille MLOps)
-- Déploiement automatique sur une VM (runner auto-hébergé + `make up`), puis Terraform `libvirt` (demande sudo, IOMMU).
-- Test de charge Locust, drift (Evidently), DCGM exporter pour le GPU dans Grafana.
+### Priorité 2 (si le temps le permet)
+- OCR sur le téléphone : cache KV du décodeur ou ORT natif (~5 s aujourd'hui pour les deux lecteurs).
+- Photos de la planche (`data/ocr/real/planche_a_imprimer.pdf`) → `eval/ocr_bench.py`, calibration du seuil de confiance.
+- Canary de `math-1.5b-distill` derrière la gateway (grille MLOps 3), DCGM exporter pour le GPU dans Grafana.
 
 ### Priorité 3
 - OCR phase 3A, jeu d'évaluation v2 plus dur, décodage spéculatif (8.5), pruning du vocabulaire, AWQ / FP8.

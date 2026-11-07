@@ -16,6 +16,17 @@ sudo pacman -S --needed qemu-base libvirt dnsmasq opentofu cdrtools && sudo syst
 Puis se reconnecter (groupe `libvirt`). Le pool `default` doit exister :
 `virsh -c qemu:///system pool-list --all` (sinon `make vm-prepare`, qui active aussi le réseau `default`).
 
+Pare-feu : avec `ufw` actif, la VM démarre mais n'obtient pas d'adresse (DHCP bloqué sur `virbr0`, `tofu apply`
+échoue sur « couldn't retrieve IP address »). Docker met aussi la chaîne `FORWARD` en `DROP`, ce qui coupe Internet
+à la VM. Une fois (les règles `DOCKER-USER` sont à reposer après un redémarrage de Docker) :
+
+```
+sudo ufw allow in on virbr0 && sudo ufw route allow in on virbr0 && sudo ufw route allow out on virbr0
+sudo iptables -I DOCKER-USER -i virbr0 -j ACCEPT && sudo iptables -I DOCKER-USER -o virbr0 -j ACCEPT
+```
+
+Le provider ajoute un écran SPICE, absent de `qemu-base` : `main.tf` déclare un VNC local à la place.
+
 ## Créer la VM
 
 Jeton d'enregistrement du runner (valable 1 h), dans `infra/terraform/runner.auto.tfvars` (ignoré par git) :
