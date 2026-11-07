@@ -1,6 +1,7 @@
 # Suivi du projet
 
 Runbook du week-end 1 : `docs/WEEKEND.md`. Bilan pour la soutenance : `docs/BILAN_MODELES_ET_APP.md`.
+Chiffres clés de tout le projet, sur une page : `docs/CHIFFRES_CLES.md`.
 Ce fichier donne l'avancement et la suite immédiate.
 
 ## Avancement des étapes
