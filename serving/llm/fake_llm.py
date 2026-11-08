@@ -8,6 +8,7 @@ ou les étapes rédigées (prompt d'explication). Un oracle : utile pour tester 
 
 from __future__ import annotations
 
+import os
 import time
 
 from fastapi import FastAPI
@@ -54,6 +55,8 @@ def models():
 @app.post("/v1/chat/completions")
 def chat(req: ChatRequest):
     text = _answer(req.messages[-1]["content"])
+    if req.model == os.getenv("FAKE_BAD_MODEL"):  # démonstration du canary : un challenger qui se trompe
+        text = "```python\nresult = [7]\nprint(result)\n```"
     return {
         "id": "fake", "object": "chat.completion", "created": int(time.time()), "model": req.model,
         "choices": [{"index": i, "message": {"role": "assistant", "content": text}, "finish_reason": "stop"}

@@ -9,8 +9,9 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Response
-from prometheus_client import CONTENT_TYPE_LATEST, Counter, Histogram, generate_latest
+from prometheus_client import CONTENT_TYPE_LATEST, Counter, Gauge, Histogram, generate_latest
 
+from serving.gateway import canary
 from serving.gateway.schema import SolveRequest, SolveResponse
 from serving.gateway.usage import Principal
 
@@ -23,6 +24,11 @@ ATTEMPTS = Histogram("gateway_solve_attempts", "Tentatives par résolution (1 + 
 SERVER_OCR = Counter("gateway_server_ocr_total", "Photos relues par l'OCR serveur et résolues avec sa lecture")
 FAITHFULNESS = Histogram("gateway_explain_faithfulness", "Fidélité des explications serveur",
                          buckets=(0.5, 0.8, 0.9, 0.95, 0.99, 1.0))
+VARIANT_SOLVES = Counter("gateway_variant_solves_total", "Résolutions où le LLM a été appelé", ["variant", "status"])
+VARIANT_LLM_SECONDS = Histogram("gateway_variant_llm_seconds", "Temps LLM par résolution", ["variant"],
+                                buckets=(0.1, 0.25, 0.5, 1, 2, 4, 8, 16, 32))
+CANARY_WEIGHT = Gauge("gateway_canary_weight", "Part du trafic envoyée au canary")
+CANARY_WEIGHT.set_function(canary.weight)
 
 router = APIRouter()
 
@@ -45,6 +51,14 @@ def observe_solve(who: Principal, req: SolveRequest, resp: SolveResponse) -> Non
     LLM_SECONDS.labels(who.user, "solve").inc(t.llm_ms / 1e3)
     if resp.code:
         ATTEMPTS.observe(resp.code.attempts)
+
+
+def observe_variant(route: canary.Route, resp: SolveResponse) -> None:
+    if resp.problem is None and not route.fell_back:
+        return  # formule illisible : le modèle n'y est pour rien
+    VARIANT_SOLVES.labels(route.variant, "fallback" if route.fell_back else resp.status).inc()
+    if not route.fell_back:
+        VARIANT_LLM_SECONDS.labels(route.variant).observe(resp.timings.llm_ms / 1e3)
 
 
 def observe_ocr(platform: str, ms: float) -> None:

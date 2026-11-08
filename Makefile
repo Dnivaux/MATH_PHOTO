@@ -67,6 +67,9 @@ vm-down: ## détruit la VM de staging
 drift: ## dérive des requêtes reçues (Evidently) ; HOURS=168, ARGS="--include-load --fail-on-drift"
 	$(PY) -m eval.drift --hours $(or $(HOURS),168) $(ARGS)
 
+canary-check: ## décision du canary (hold, advance, rollback) ; HOURS=1, ARGS=--apply pour l'appliquer
+	$(PY) -m eval.canary_check --hours $(or $(HOURS),1) $(ARGS)
+
 load-test: ## test de charge par paliers (stack lancée : make up) ; USERS="1 4 8 16 32" DURATION=60 ; VM : HOST=http://<ip>:8100 ENV=staging
 	$(PY) -m eval.load_test --users $(or $(USERS),1 4 8 16 32) --duration $(or $(DURATION),60) --host $(or $(HOST),http://localhost:8100) --env $(or $(ENV),local)
 

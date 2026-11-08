@@ -12,7 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy.exc import IntegrityError
 
-from serving.gateway import usage
+from serving.gateway import canary, usage
 from serving.gateway.auth import require_admin
 
 router = APIRouter(prefix="/admin", dependencies=[Depends(require_admin)], tags=["admin"])
@@ -25,6 +25,10 @@ class NewUser(BaseModel):
 class NewKey(BaseModel):
     kind: Literal["user", "device"] = "user"
     label: str | None = Field(None, max_length=64)
+
+
+class CanaryWeight(BaseModel):
+    weight: float = Field(ge=0, le=1)
 
 
 class IssuedKey(BaseModel):
@@ -74,3 +78,15 @@ def get_usage(hours: float = 24, user: str | None = None):
 def get_usage_rows(hours: float = 24 * 7, endpoint: str | None = None, limit: int = 50_000):
     """Lignes d'usage brutes (sans formule ni photo) : entrée de la détection de dérive (eval/drift.py)."""
     return usage.rows(hours, endpoint, min(limit, 200_000))
+
+
+@router.get("/canary")
+def get_canary():
+    return {"weight": canary.weight()}
+
+
+@router.put("/canary")
+def put_canary(body: CanaryWeight):
+    """Part du trafic envoyée au canary : 0 pour revenir en arrière, 1 pour lui donner tout le trafic."""
+    canary.set_weight(body.weight)
+    return {"weight": canary.weight()}

@@ -272,6 +272,26 @@ Postgres et le bac à sable qui exécute et vérifie le code ; OCR serveur et re
 Capacité : au moins 64 utilisateurs simultanés sous le budget (p95 ≤ 5 s), 0 échec sur 2 533 requêtes. La latence
 décolle à 64 (bac à sable sur 8 vCPU). Sur le PC avec le vrai 7B : 64 utilisateurs, 16,6 req/s, p95 1,7 s.
 
+## Canary du modèle de code (8 novembre)
+
+La gateway envoie une part des `/v1/solve` (`CANARY_WEIGHT`, 10 % par défaut) à `math-1.5b-distill`, servi par son
+propre vLLM ; le reste va au 7B + LoRA. Si le challenger ne répond pas, le champion prend le relais. Métriques par
+variante (`gateway_variant_*`, 4 panneaux Grafana), part réglable par `PUT /admin/canary`. `make canary-check` compare
+les variantes sur le trafic réel : `rollback` si le challenger perd plus de 2 pts de résolutions vérifiées (bruit mesuré),
+si sa p95 LLM dépasse 1,2 fois celle du champion, ou s'il provoque plus de 1 % de replis ; `hold` sous 30 requêtes ;
+sinon `advance` (10, 25, 50, 100 %). Un run MLflow `canary-check` par décision.
+
+Vérifié sans GPU (profil `ci`, Locust, 8 utilisateurs, part de 25 %) :
+
+| Scénario | Champion | Challenger | Décision |
+|---|---|---|---|
+| Challenger faux (`FAKE_BAD_MODEL`) | 233 requêtes, 100 % vérifiées | 85 requêtes, 0 % vérifiées | `rollback`, part 25 % → 0 |
+| Challenger correct | 226 requêtes, 100 % vérifiées | 61 requêtes, 100 % vérifiées | `advance`, part 25 → 50 % |
+
+À faire avec le GPU : confirmer que les deux vLLM tiennent ensemble (`GPU_UTIL=0.60`, `CANARY_GPU_UTIL=0.20`) et mesurer
+le canary réel. Limite : le 7B et le 1,5B sont deux entrées du registry, une promotion passe donc par la part à 100 %, pas
+par un alias.
+
 ## Suite
 
 Relancer : `make up` (tout), ou `make infra-up` seul pour entraîner. Gateway sur :8100, jeton `dev-token`.
@@ -284,7 +304,7 @@ Relancer : `make up` (tout), ou `make infra-up` seul pour entraîner. Gateway su
 ### Priorité 2 (si le temps le permet)
 - OCR sur le téléphone : cache KV du décodeur ou ORT natif (~5 s aujourd'hui pour les deux lecteurs).
 - Photos de la planche (`data/ocr/real/planche_a_imprimer.pdf`) → `eval/ocr_bench.py`, calibration du seuil de confiance.
-- Canary de `math-1.5b-distill` derrière la gateway (grille MLOps 3), DCGM exporter pour le GPU dans Grafana.
+- Canary de `math-1.5b-distill` : mesure avec le GPU (code et démo sans GPU faits, voir ci-dessus), DCGM exporter pour le GPU dans Grafana.
 
 ### Priorité 3
 - OCR phase 3A, jeu d'évaluation v2 plus dur, décodage spéculatif (8.5), pruning du vocabulaire, AWQ / FP8.

@@ -8,6 +8,9 @@ scrape_configs:
   - job_name: vllm   # tokens/s, cache KV, décodage spéculatif
     static_configs:
       - targets: ["vllm:8000"]
+  - job_name: vllm-canary   # challenger du canary
+    static_configs:
+      - targets: ["vllm-canary:8000"]
   - job_name: explainer   # llama-server lancé avec --metrics
     static_configs:
       - targets: ["explainer:8000"]

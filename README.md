@@ -18,7 +18,7 @@ docs/api/     contrat v1 généré (OpenAPI, JSON Schema, exemples)
 
 ```bash
 make infra-up && make env && make env-check   # infra + environnement GPU
-make test                                     # 51 tests (bac à sable, générateur, fidélité, gateway, usage)
+make test                                     # 72 tests (bac à sable, générateur, fidélité, gateway, usage, canary)
 make mock                                     # gateway factice :8100, Authorization: Bearer dev-token
 make up                                       # stack complète en une commande (modèles champion du registry)
 make up-ci                                    # même stack sans GPU (faux LLM)
@@ -35,7 +35,8 @@ make help                                     # toutes les commandes
 | `GET /v1/models/{client}/latest?role=explainer` | manifeste du `champion` du registry (URL, SHA-256, taille) |
 | `GET /v1/models/files/...` | fichier du modèle (reprise de téléchargement par `Range`) |
 | `/admin/...` | utilisateurs, clés hachées, usage par utilisateur (jeton `GATEWAY_ADMIN_TOKEN`) |
-| `GET /metrics` | métriques Prometheus (requêtes, latences par étape, escalades, temps LLM par utilisateur) |
+| `GET`, `PUT /admin/canary` | part du trafic de `/v1/solve` envoyée au challenger (0 = retour arrière, 1 = tout le trafic) |
+| `GET /metrics` | métriques Prometheus (requêtes, latences par étape, escalades, temps LLM par utilisateur, canary) |
 
 Le code généré s'exécute dans le conteneur `sandbox` : réseau interne seulement (ni Internet, ni Postgres, ni
 MLflow), système de fichiers en lecture seule, aucune capability, processus et mémoire limités.
@@ -47,6 +48,10 @@ curl -X POST localhost:8100/admin/users/dae/keys -H "Authorization: Bearer $ADMI
      -d '{"kind": "device", "label": "Pixel 7"}'
 curl "localhost:8100/admin/usage?hours=24" -H "Authorization: Bearer $ADMIN"
 ```
+
+**Canary du modèle de code** : `make up` envoie 10 % des résolutions à `math-1.5b-distill` (`CANARY_WEIGHT`), le reste au
+7B + LoRA. `make canary-check` compare les deux sur le trafic réel et décide `hold`, `advance` ou `rollback` ;
+`ARGS=--apply` règle la part (10, 25, 50, puis 100 %, ou 0 en cas de retour arrière).
 
 Mesures sur téléphone → MLflow : `eval/device_bench.py` (protocole en tête du fichier).
 App Android : `clients/mobile/` (README dédié) ; APK construit par la CI (`.github/workflows/apk.yml`, à la main ou sur un tag `v*`).

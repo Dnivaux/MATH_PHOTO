@@ -20,7 +20,7 @@ from openai import OpenAI
 
 from common.prompts import explain_messages
 from eval.faithfulness import check_explanation
-from serving.gateway import admin, metrics, models, pipeline, usage
+from serving.gateway import admin, canary, metrics, models, pipeline, usage
 from serving.gateway.auth import require_token
 from serving.gateway.features import latex_features
 from serving.gateway.schema import (
@@ -34,8 +34,12 @@ VLLM_MODEL = os.getenv("VLLM_MODEL", "teacher-ft")
 # Version du registry MLflow servie : variable, sinon le fichier écrit par serving/fetch_models.py (docker compose)
 _VERSION_FILE = Path(os.getenv("REGISTRY_DIR", "/registry"), os.getenv("CODE_MODEL_REGISTRY", "math-7b-teacher"), "VERSION")
 MODEL_VERSION = os.getenv("VLLM_MODEL_VERSION") or (_VERSION_FILE.read_text().strip() if _VERSION_FILE.exists() else None)
+VLLM_CANARY_BASE_URL = os.getenv("VLLM_CANARY_BASE_URL")  # vide : pas de canary
+VLLM_CANARY_MODEL = os.getenv("VLLM_CANARY_MODEL", "math-1.5b-distill")
+_CANARY_VERSION_FILE = Path(os.getenv("REGISTRY_DIR", "/registry"), VLLM_CANARY_MODEL, "VERSION")
+CANARY_MODEL_VERSION = _CANARY_VERSION_FILE.read_text().strip() if _CANARY_VERSION_FILE.exists() else None
 EXPLAIN_BASE_URL = os.getenv("EXPLAIN_BASE_URL")
-EXPLAIN_MODEL = os.getenv("EXPLAIN_MODEL", "explainer")
+EXPLAIN_MODEL =os.getenv("EXPLAIN_MODEL", "explainer")
 OCR_URL = os.getenv("OCR_URL")  # service OCR serveur (serving/ocr/service.py, TexTeller)
 # Développement seulement (vide par défaut) : garde les photos relues et la lecture du serveur, pour comprendre
 # une mauvaise lecture et constituer le jeu de vraies photos. Jamais activé en production (données des élèves).
@@ -46,6 +50,7 @@ app.include_router(models.router)
 app.include_router(admin.router)
 app.include_router(metrics.router)
 _code_client = OpenAI(base_url=VLLM_BASE_URL, api_key="EMPTY", timeout=60)
+_canary_client = OpenAI(base_url=VLLM_CANARY_BASE_URL, api_key="EMPTY", timeout=60) if VLLM_CANARY_BASE_URL else None
 
 
 async def _read_image_async(image_base64: str) -> str:
@@ -70,6 +75,11 @@ def _generate_code(messages: list[dict]) -> str:
     return r.choices[0].message.content or ""
 
 
+def _generate_canary(messages: list[dict]) -> str:
+    r = _canary_client.chat.completions.create(model=VLLM_CANARY_MODEL, messages=messages, temperature=0.0, max_tokens=1024)
+    return r.choices[0].message.content or ""
+
+
 @app.get("/health", response_model=Health)
 def health():
     try:
@@ -81,17 +91,22 @@ def health():
 
 @app.post("/v1/solve", response_model=SolveResponse)
 async def solve(req: SolveRequest, bg: BackgroundTasks, who: Principal = Depends(require_token)):
-    info = ModelInfo(code_model=VLLM_MODEL, code_model_version=MODEL_VERSION)
+    route = canary.Route(_generate_code, _generate_canary if _canary_client else None)
     # Le bac à sable et SymPy sont bloquants : on les sort de la boucle asyncio.
-    resp = await run_in_threadpool(pipeline.solve, req, _generate_code, info, None, _read_image if OCR_URL else None)
+    resp = await run_in_threadpool(pipeline.solve, req, route, None, None, _read_image if OCR_URL else None)
+    on_canary = route.variant == "canary" and not route.fell_back
+    model, version = (VLLM_CANARY_MODEL, CANARY_MODEL_VERSION) if on_canary else (VLLM_MODEL, MODEL_VERSION)
+    resp.models = ModelInfo(code_model=model, code_model_version=version)
     metrics.observe_solve(who, req, resp)
+    metrics.observe_variant(route, resp)
     # Usage par utilisateur, écrit après l'envoi de la réponse
     bg.add_task(usage.record, who, "solve", platform=req.client.platform, mode=req.client.mode,
                 problem_type=resp.problem.type.value if resp.problem else None,
                 escalation_reason=req.escalation.reason.value if req.escalation else None,
                 status=resp.status, error_code=resp.error.code.value if resp.error else None,
-                total_ms=resp.timings.total_ms, llm_ms=resp.timings.llm_ms, model=VLLM_MODEL, model_version=MODEL_VERSION,
-                extra={"attempts": resp.code.attempts if resp.code else None, "request_id": resp.request_id,
+                total_ms=resp.timings.total_ms, llm_ms=resp.timings.llm_ms, model=model, model_version=version,
+                extra={"variant": route.variant, "canary_fallback": route.fell_back,
+                       "attempts": resp.code.attempts if resp.code else None, "request_id": resp.request_id,
                        "input": "+".join(k for k, v in (("latex", req.latex), ("image", req.image_base64)) if v),
                        "latex_source": resp.problem.latex_source if resp.problem else None, "ocr_ms": resp.timings.ocr_ms,
                        # suivi de dérive (eval/drift.py) : caractéristiques de la formule, pas la formule

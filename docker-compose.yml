@@ -15,6 +15,10 @@ x-gateway: &gateway
   environment: &gateway-env
     VLLM_BASE_URL: http://vllm:8000/v1
     VLLM_MODEL: teacher-ft
+    # canary du modèle de code : part du trafic de /v1/solve, réglable ensuite par PUT /admin/canary
+    VLLM_CANARY_BASE_URL: http://vllm-canary:8000/v1
+    VLLM_CANARY_MODEL: ${CANARY_REGISTRY:-math-1.5b-distill}
+    CANARY_WEIGHT: ${CANARY_WEIGHT:-0.1}
     EXPLAIN_BASE_URL: http://explainer:8000/v1
     EXPLAIN_MODEL: explainer
     MLFLOW_TRACKING_URI: http://mlflow:5000
@@ -132,7 +136,7 @@ services:
     volumes:
       - registry:/registry
       - ./serving/fetch_models.py:/fetch_models.py:ro
-    command: ["python", "/fetch_models.py", "math-7b-teacher", "${EXPLAINER_REGISTRY:-explainer-0.6b-p20-gguf}"]
+    command: ["python", "/fetch_models.py", "math-7b-teacher", "${EXPLAINER_REGISTRY:-explainer-0.6b-p20-gguf}", "${CANARY_REGISTRY:-math-1.5b-distill}"]
 
   vllm:
     # Qwen2.5-Math-7B + adaptateur QLoRA `teacher-ft` du registry (même version de vLLM que le venv).
@@ -149,7 +153,7 @@ services:
       - --lora-modules
       - teacher-ft=/registry/math-7b-teacher/model
       - --max-model-len=4096
-      - --gpu-memory-utilization=${GPU_UTIL:-0.80}   # le reste : TexTeller (service ocr) et le bureau
+      - --gpu-memory-utilization=${GPU_UTIL:-0.60}   # le reste : canary, TexTeller (service ocr) et le bureau
     environment:
       HF_HUB_OFFLINE: "1"   # poids de base déjà dans le cache de l'hôte, monté en lecture seule
     volumes:
@@ -158,6 +162,39 @@ services:
     ipc: host
     ports:
       - "8000:8000"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8000/health"]
+      interval: 10s
+      start_period: 600s
+      retries: 6
+    restart: unless-stopped
+
+  vllm-canary:
+    # Challenger du canary : Qwen2.5-Math-1.5B distillé, dans son propre vLLM.
+    image: vllm/vllm-openai:v0.30.0@sha256:8a69ffad015f138d7170c4ddc429e230a3bc1c1719f67e14324749df200a4b90
+    profiles: [gpu]
+    depends_on:
+      vllm:
+        condition: service_healthy   # vLLM contrôle la mémoire libre au démarrage : l'un après l'autre
+    command:
+      - /registry/${CANARY_REGISTRY:-math-1.5b-distill}/model
+      - --served-model-name=${CANARY_REGISTRY:-math-1.5b-distill}
+      - --max-model-len=4096
+      - --gpu-memory-utilization=${CANARY_GPU_UTIL:-0.20}
+    environment:
+      HF_HUB_OFFLINE: "1"
+    volumes:
+      - registry:/registry:ro
+    ipc: host
+    ports:
+      - "8001:8000"
     deploy:
       resources:
         reservations:
@@ -223,11 +260,13 @@ services:
     build: {context: ., dockerfile: serving/gateway/Dockerfile}
     profiles: [ci]
     command: ["uvicorn", "serving.llm.fake_llm:app", "--host", "0.0.0.0", "--port", "8000"]
+    environment:
+      FAKE_BAD_MODEL: ${FAKE_BAD_MODEL:-}   # démonstration du canary : ce modèle se trompe
     volumes:
       - ./data:/app/data:ro
     networks:
       default:
-        aliases: [vllm, explainer]
+        aliases: [vllm, vllm-canary, explainer]
 
   sandbox:
     # Exécution du code généré (dossier, phase 5). Réseau interne seulement : ni Internet, ni Postgres, ni MLflow.
