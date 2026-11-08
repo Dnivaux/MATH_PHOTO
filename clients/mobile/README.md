@@ -66,7 +66,7 @@ réponses sans GPU, `scripts/dev_gateway.py` résout chaque problème avec `data
 marquées « non confirmées ») :
 
 ```bash
-PYTHONPATH=../../MATH_PHOTO uv run --no-project --python 3.12 --with sympy --with lark --with 'antlr4-python3-runtime==4.11.*' --with pydantic --with fastapi --with 'uvicorn[standard]' uvicorn --app-dir scripts dev_gateway:app --port 8100
+PYTHONPATH=../.. uv run --no-project --python 3.12 --with-editable ../.. uvicorn --app-dir scripts dev_gateway:app --host 0.0.0.0 --port 8100
 ```
 
 Puis `adb reverse tcp:8100 tcp:8100` et `http://localhost:8100` dans Réglages → Outils de développement

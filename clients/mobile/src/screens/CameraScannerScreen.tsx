@@ -2,15 +2,17 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Image, Pressable, StatusBar, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { useIsFocused } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Camera, PhotoFile, useCameraDevice, useCameraFormat, useCameraPermission } from 'react-native-vision-camera';
+import { Camera, PhotoFile, useCameraFormat, useCameraPermission } from 'react-native-vision-camera';
 import ImageCropPicker from 'react-native-image-crop-picker';
 import { Calculator, Camera as CameraIcon, CloudOff, History, Settings, Zap, ZapOff } from 'lucide-react-native';
 import { CameraOverlayMask } from '../components/camera/CameraOverlayMask';
 import { ResizableBoundingBox } from '../components/camera/ResizableBoundingBox';
 import { CameraControls, CONTROLS_HEIGHT } from '../components/camera/CameraControls';
+import { sensorCrop } from '../components/camera/sensorCrop';
 import { ScannedFormulaCard } from '../components/math/ScannedFormulaCard';
 import { Button } from '../components/ui';
 import { showSnackbar } from '../components/ui/Snackbar';
+import { useBackCamera } from '../hooks/useBackCamera';
 import { useResizableBox } from '../hooks/useResizableBox';
 import { EngineStatus, FractionRect, MathEngine } from '../engine/MathEngine';
 import { fileToBase64, recognizeOnDevice } from '../services/ocr';
@@ -44,26 +46,18 @@ const ChromeButton: React.FC<{ icon: any; label: string; onPress: () => void; se
   </Pressable>
 );
 
-/** Zone de la photo (en pixels) qui correspond au cadre affiché, l'aperçu étant en mode « cover » */
-function sensorCrop(pw: number, ph: number, sw: number, sh: number, box: { x: number; y: number; width: number; height: number }) {
-  const scale = Math.max(sw / pw, sh / ph);
-  const offX = (pw - sw / scale) / 2;
-  const offY = (ph - sh / scale) / 2;
-  const x = Math.max(0, Math.round(offX + box.x / scale));
-  const y = Math.max(0, Math.round(offY + box.y / scale));
-  return { x, y, width: Math.min(pw - x, Math.round(box.width / scale)), height: Math.min(ph - y, Math.round(box.height / scale)) };
-}
-
 export const CameraScannerScreen: React.FC<Props> = ({ navigation }) => {
   const { c, scheme } = useTheme();
   const insets = useSafeAreaInsets();
   const focused = useIsFocused();
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   const { hasPermission, requestPermission } = useCameraPermission();
-  const device = useCameraDevice('back');
+  const device = useBackCamera();
   // ~2 Mpx suffisent pour une formule et gardent l'image légère pour l'OCR
   const format = useCameraFormat(device, [{ photoResolution: { width: 1920, height: 1080 } }]);
   const cameraRef = useRef<Camera>(null);
+  // taille réelle de l'aperçu : useWindowDimensions ne compte pas la barre d'état, sous laquelle il passe
+  const previewSize = useRef<{ width: number; height: number } | null>(null);
 
   const [torch, setTorch] = useState<'off' | 'on'>('off');
   const [isProcessing, setIsProcessing] = useState(false);
@@ -211,10 +205,11 @@ export const CameraScannerScreen: React.FC<Props> = ({ navigation }) => {
       setFrozen(`file://${photo.path}`);
       const rect = box.getCropRect();
       // la photo peut être dans l'orientation du capteur (paysage) : on raisonne dans celle de l'écran
-      const portraitScreen = screenHeight >= screenWidth;
+      const view = previewSize.current ?? { width: screenWidth, height: screenHeight };
+      const portraitScreen = view.height >= view.width;
       const portraitPhoto = photo.height >= photo.width;
       const [pw, ph] = portraitScreen === portraitPhoto ? [photo.width, photo.height] : [photo.height, photo.width];
-      const crop = sensorCrop(pw, ph, screenWidth, screenHeight, rect);
+      const crop = sensorCrop(pw, ph, view.width, view.height, rect);
       const frac: FractionRect = { x: crop.x / pw, y: crop.y / ph, width: crop.width / pw, height: crop.height / ph };
       await recognize(await fileToBase64(photo.path), 'image/jpeg', frac);
     } catch (e) {
@@ -258,17 +253,18 @@ export const CameraScannerScreen: React.FC<Props> = ({ navigation }) => {
           <CameraIcon size={32} color={c.onPrimaryContainer} strokeWidth={2} />
         </View>
         <Text style={[type.headline, styles.center, { color: c.text }]}>
-          {device ? 'Photographie tes exercices' : 'Pas de caméra disponible'}
+          {!hasPermission ? 'Photographie tes exercices' : 'Pas de caméra disponible'}
         </Text>
         <Text style={[type.body, styles.center, { color: c.textMuted }]}>
-          {device
+          {!hasPermission
             ? 'L’app a besoin de la caméra pour lire une formule. La photo reste sur ton téléphone.'
             : 'Tu peux saisir la formule avec la calculatrice ou choisir une image dans la galerie.'}
         </Text>
         <View style={styles.permissionActions}>
-          {device ? <Button label="Autoriser la caméra" onPress={requestPermission} /> : null}
-          <Button label="Ouvrir la calculatrice" icon={Calculator} variant={device ? 'text' : 'filled'} onPress={() => openCalculator()} />
-          {!device ? <Button label="Choisir une image" variant="text" onPress={handlePickImage} /> : null}
+          {/* certains téléphones ne listent aucune caméra tant que la permission n'est pas accordée */}
+          {!hasPermission ? <Button label="Autoriser la caméra" onPress={requestPermission} /> : null}
+          <Button label="Ouvrir la calculatrice" icon={Calculator} variant={!hasPermission ? 'text' : 'filled'} onPress={() => openCalculator()} />
+          {hasPermission ? <Button label="Choisir une image" variant="text" onPress={handlePickImage} /> : null}
         </View>
       </View>
     );
@@ -283,7 +279,7 @@ export const CameraScannerScreen: React.FC<Props> = ({ navigation }) => {
         : null;
 
   return (
-    <View style={styles.container}>
+    <View style={styles.container} onLayout={e => (previewSize.current = e.nativeEvent.layout)}>
       <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
       <Camera
         ref={cameraRef}
