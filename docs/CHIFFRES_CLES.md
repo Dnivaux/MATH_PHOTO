@@ -104,6 +104,7 @@ Les deux lecteurs prennent ~4,9 s : c'est le poste le plus lent de l'app.
 | Niveau 2 : dérive | Evidently : trafic normal 0 colonne sur 6 en dérive ; trafic de limites seulement 6 sur 6 |
 | Niveau 2 : interface | App Android (APK 142 Mo) |
 | Niveau 3 : quantization | GGUF Q4_K_M (LLM), ONNX INT8 (OCR), voir sections 5 et 6 |
+| Niveau 3 : canary | `math-1.5b-distill` contre le 7B + LoRA, paliers 10 → 25 → 50 → 100 % (`make canary-check`) : 100 % vérifiés à chaque palier, 0 repli ; p95 /v1/solve 1,5 s → 0,58 s à 8 utilisateurs (8 novembre) |
 | Sécurité du code exécuté | Bac à sable en conteneur : réseau interne seul, lecture seule, `cap_drop: ALL`, AST + liste blanche, 9 tests d'attaque |
 
 Test de charge (Locust, paliers d'une minute) :
@@ -119,4 +120,5 @@ Test de charge (Locust, paliers d'une minute) :
 
 - Jeu d'évaluation v1 trop facile (98 – 100 % partout) : ± 2 pts de bruit entre deux runs identiques.
 - OCR : ~5 s sur le téléphone, 78 % en manuscrit hors ligne, vraies photos encore peu nombreuses.
-- Non faits : canary, Kubernetes, décodage spéculatif, AWQ / FP8 du 7B serveur.
+- Non faits : Kubernetes, décodage spéculatif, AWQ / FP8 du 7B serveur. Canary fait, mais le 1,5B n'est pas encore
+  champion en titre (`VLLM_MODEL`, alias MLflow) ; retour arrière automatique montré seulement sans GPU.

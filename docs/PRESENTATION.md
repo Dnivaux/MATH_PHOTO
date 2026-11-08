@@ -162,7 +162,7 @@ parce que tout le reste (registry, champion, déploiement) s'appuie dessus.
   | 7B brut | 3,49 s | gris |
   | 7B + QLoRA (teacher-ft), **en production** | 1,40 s | couleur principale |
   | 1,5B brut | 1,23 s | gris |
-  | 1,5B distillé, **candidat** | **0,43 s** | couleur principale, mise en avant |
+  | 1,5B distillé, **canary validé** | **0,43 s** | couleur principale, mise en avant |
 
 - **Panneau du bas, à droite** : **100 %** de résultats justes (99,6 % pour le 7B brut) · 314 → 82 jetons par réponse ·
   QLoRA en 67 min et 10,9 Go de VRAM.
@@ -171,7 +171,8 @@ parce que tout le reste (registry, champion, déploiement) s'appuie dessus.
     téléphone vus avant ; chaque modèle du registry connaît son parent et le hash de ses données.
   - Exemple sur le modèle serveur (l'étape « Calcul ») : tous étaient déjà entre 98 et 100 %, donc le banc a départagé
     sur la vitesse. Le QLoRA apprend le format (du code direct, sans phrases autour) : 2,5 fois plus rapide, et c'est
-    lui qui tourne en production. Le 1,5B distillé depuis ce 7B fait 100 % en 0,43 s : c'est notre candidat suivant.
+    lui qui tourne en production. Le 1,5B distillé depuis ce 7B fait 100 % en 0,43 s ; le banc seul ne suffit pas pour
+    le promouvoir, d'où le canary (slide suivante).
 
 ### Slide 7 : Déployer, tester, surveiller (2 min 30)
 
@@ -192,8 +193,16 @@ parce que tout le reste (registry, champion, déploiement) s'appuie dessus.
 
   Dessous : correctifs (bac à sable 2 → 8 cœurs, OCR serveur asynchrone), débit 5,9 → 16,6 req/s, VM : 0 échec sur
   2 533 requêtes.
-- **Panneau 3, « Surveiller »** : une capture Grafana, puis dérive Evidently **0/6** colonnes en trafic normal contre
-  **6/6** en trafic de limites seulement, puis une ligne sur l'alias `champion`.
+- **Panneau 3, « Surveiller et promouvoir »** : une capture Grafana (ligne « Canary »), puis dérive Evidently **0/6**
+  colonnes en trafic normal contre **6/6** en trafic de limites seulement, puis le canary : paliers 10 → 25 → 50 →
+  100 %, 100 % vérifiés à chaque palier, p95 de `/v1/solve` **1,5 s → 0,58 s**.
+
+  | Palier | Requêtes au 1,5B | Vérifiées | p95 LLM 1,5B / 7B | Décision |
+  |---|---|---|---|---|
+  | 10 % | 56 | 100 % | 681 / 1 337 ms | advance |
+  | 25 % | 175 | 100 % | 794 / 1 556 ms | advance |
+  | 50 % | 339 | 100 % | 817 / 1 759 ms | advance |
+  | 100 % | 810 | 100 % | 517 ms | hold (plus de trafic au 7B) |
 - **Bandeau en bas** : « En local : `make up` lance les 10 conteneurs, modèles servis depuis le registry · accès par
   jeton haché, usage suivi par utilisateur »
 - **À dire** :
@@ -201,9 +210,12 @@ parce que tout le reste (registry, champion, déploiement) s'appuie dessus.
     déployé et vérifié par une vraie résolution, sinon retour arrière, et on l'a vu fonctionner en vrai.
   - Le test de charge (Locust par paliers, résultats dans MLflow) a trouvé deux goulots, qu'on a corrigés.
   - On surveille en continu : Grafana pour le trafic et la latence, Evidently pour la dérive des formules reçues.
+  - Canary : la gateway envoie une part des `/v1/solve` au 1,5B distillé, `make canary-check` compare les deux modèles
+    sur le trafic réel (justesse, p95, replis) et décide d'avancer, d'attendre ou de revenir à 0 %. Il a passé les
+    4 paliers sans une erreur, et la latence a été divisée par 2,6. Un mauvais challenger ne peut rien casser : SymPy
+    vérifie tout, au pire la réponse est marquée « non vérifiée ».
   - Le téléphone télécharge le modèle `champion` avec son SHA-256 : changer de modèle revient à déplacer un alias,
-    sans nouvelle version de l'app. C'est le lien entre les deux sujets. Exemple réel : la version prunée a été
-    dé-promue après l'éval sur les 3 niveaux.
+    sans nouvelle version de l'app. C'est le lien entre les deux sujets.
 
 ---
 
@@ -216,9 +228,9 @@ parce que tout le reste (registry, champion, déploiement) s'appuie dessus.
   - **Embarqué** : ✅ modèles packagés (OCR + LLM) · ✅ quantization (GGUF Q4/Q8, ONNX INT8) · ✅ comparaison taille /
     précision / vitesse sur le téléphone · ✅ meilleur compromis déployé
   - **MLOps** : ✅ une commande · ✅ VM + déploiement continu · ✅ jeton + usage · ✅ test de charge · ✅ OpenTofu ·
-    ✅ app mobile · ✅ dérive · ✅ MLflow · ✅ quantization
-  - **Limites** : jeu d'évaluation trop facile (98 – 100 % partout) · OCR lent sur le téléphone (~5 s) · pas de
-    canary ni de Kubernetes
+    ✅ app mobile · ✅ dérive · ✅ MLflow · ✅ quantization · ✅ canary
+  - **Limites** : jeu d'évaluation trop facile (98 – 100 % partout) · OCR lent sur le téléphone (~5 s) · le 1,5B
+    n'est pas encore champion en titre (à faire : `VLLM_MODEL` et alias) · pas de Kubernetes
 - **Puis** : la démo (vidéo de 30 à 45 s, ou en direct).
 
 ---
