@@ -133,7 +133,7 @@ export const SettingsScreen: React.FC<Props> = ({ navigation }) => {
 
   const exportBench = async () => {
     const ev = await recentEvents(500);
-    Share.share({ title: 'Mesures Photo → Maths', message: JSON.stringify({ app: APP_VERSION, ram, events: ev }, null, 1) });
+    Share.share({ title: 'Mesures PhotoMathon', message: JSON.stringify({ app: APP_VERSION, ram, events: ev }, null, 1) });
   };
 
   let modelBlock: React.ReactNode;
@@ -244,7 +244,7 @@ export const SettingsScreen: React.FC<Props> = ({ navigation }) => {
         <Section title="À propos">
           <Row
             first
-            title="Photo → Maths"
+            title="PhotoMathon"
             subtitle={`Version ${APP_VERSION} · OCR ${engine.ocrModel ?? 'pix2text-mfr'} · CortexJS ${VERSIONS.cortex}`}
           />
           <Row
