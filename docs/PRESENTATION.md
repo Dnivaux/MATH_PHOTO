@@ -1,16 +1,17 @@
 # Présentation : plan détaillé, slide par slide
 
 Consigne du prof : pas de slide remplie de texte, seulement l'essentiel (chiffres clés, tableaux, graphiques).
-Les chiffres viennent de `docs/CHIFFRES_CLES.md`. 12 slides ; les durées supposent un oral de 15 minutes, à
+Les chiffres viennent de `docs/CHIFFRES_CLES.md`. 8 slides ; les durées supposent un oral de 15 minutes, à
 ajuster. Règle pour chaque slide : un titre qui dit le message, un seul visuel principal, au plus 3 chiffres en
 gros, et le reste à l'oral.
 
 **Fil conducteur** : 3 temps, avec une phrase de transition à chaque changement de partie.
 
 1. **Le projet** (slides 1 à 3) : ce que fait l'app, comment elle est construite.
-2. **Sujet Embarqué** (slides 4 à 6) : les modèles sur le téléphone, dans l'ordre du parcours : OCR, puis explication.
-3. **Sujet MLOps** (slides 7 à 11) : comment on fabrique, déploie, teste et surveille les modèles.
-4. **Bilan** (slide 12), puis la démo.
+2. **Sujet Embarqué** (slides 4 et 5) : les modèles sur le téléphone, dans l'ordre du parcours : OCR, puis explication.
+3. **Sujet MLOps** (slides 6 et 7) : comment on fabrique et évalue les modèles, puis comment on les déploie, les teste
+   et les surveille.
+4. **Bilan** (slide 8), puis la démo.
 
 Pourquoi cet ordre : le jury note deux sujets, donc chacun a son bloc d'un seul tenant. Dans l'embarqué, on suit les
 étapes de la slide de contexte (OCR puis explication). Les données et le banc d'évaluation ouvrent le bloc MLOps,
@@ -90,10 +91,12 @@ parce que tout le reste (registry, champion, déploiement) s'appuie dessus.
   - Limite : ~5 s pour les deux lecteurs, prochaine optimisation.
 - **Transition** : « Après la lecture, l'explication : un LLM qu'il a fallu rendre assez petit pour le téléphone. »
 
-### Slide 5 : Explicateur, la chaîne de compression (1 min 15)
+### Slide 5 : Explicateur, compresser puis mesurer sur le téléphone (2 min)
 
-- **Titre** : « Distiller, élaguer, réparer, quantifier »
-- **Graphique** : barres ou escalier, acceptation des explications au lycée (%), avec la taille sous chaque barre.
+- **Titre** : « Explicateur : compresser, puis mesurer sur le téléphone »
+- **Mise en page** : deux panneaux côte à côte, puis un bandeau bleu en bas.
+- **Panneau gauche, « 1 · Compresser Qwen3-0,6B »** : barres horizontales, acceptation des explications au lycée (%),
+  avec la taille sous chaque étape.
 
   | Étape | Acceptation | Taille |
   |---|---|---|
@@ -103,14 +106,9 @@ parce que tout le reste (registry, champion, déploiement) s'appuie dessus.
   | + LoRA de réparation (6,7 min) | 96,4 % | ~1 000 Mo |
   | GGUF Q4_K_M | 95,2 % | 324 Mo |
 
-- **Ligne pointillée horizontale** à 90 % : « enseignant Qwen3-8B »
-- **À dire** : la distillation fait passer le 0,6B au-dessus de son enseignant 8B. Le pruning casse tout (17,6 %),
-  7 minutes de LoRA réparent. Puis la quantization divise la taille par 3,5.
-
-### Slide 6 : Explicateur, quantization mesurée sur le téléphone (1 min 30) ⭐
-
-- **Titre** : « Sans quantization, le modèle est inutilisable sur le téléphone »
-- **Graphique principal** : nuage de points.
+  Ligne pointillée verticale à 90 % : « prof Qwen3-8B ». Sous le graphique : « la version élaguée a ensuite été
+  retirée, après la mesure sur le téléphone ».
+- **Panneau droit, « 2 · Mesurer sur le S24 Ultra »** ⭐ : nuage de points.
   - Axe x : temps d'une explication sur le S24 Ultra (s), de 0 à 22
   - Axe y : acceptation au collège (%), de 80 à 100
   - Couleur : non prunée / prunée ; étiquette sur chaque point
@@ -124,7 +122,9 @@ parce que tout le reste (registry, champion, déploiement) s'appuie dessus.
   | Prunée Q8_0 | 2,6 | 92,0 |
   | Prunée Q4_K_M | 2,9 | 82,0 |
 
-- **Petit tableau à droite** (3 lignes seulement) :
+- **Bandeau en bas** : « Déployé : distillé, non élagué, Q4_K_M → **391 Mo** · 835 Mo de RAM · **3,3 s** par
+  explication, hors ligne »
+- **Pour les questions** (pas sur la slide) :
 
   | | Fichier | RAM | Vitesse |
   |---|---|---|---|
@@ -133,6 +133,8 @@ parce que tout le reste (registry, champion, déploiement) s'appuie dessus.
   | **Q4_K_M** | **391 Mo** | **835 Mo** | **66 tok/s** |
 
 - **À dire** :
+  - On a tenté les 3 optimisations. La distillation fait passer le 0,6B au-dessus de son enseignant 8B. Le pruning
+    casse tout (17,6 %), 7 minutes de LoRA réparent. Puis la quantization divise la taille par 3,5.
   - Mesuré sur le téléphone lui-même : llama-bench lancé par adb, avec les réglages de l'app (4 fils CPU).
   - F16 met 20 secondes : la quantization est obligatoire.
   - Q4 et Q8 vont aussi vite ; Q4 est 3 fois plus petit et prend 460 Mo de RAM en moins, pour 1,6 point de moins.
@@ -144,82 +146,70 @@ parce que tout le reste (registry, champion, déploiement) s'appuie dessus.
 
 ## Partie 3 : Sujet MLOps
 
-### Slide 7 : Données et banc d'évaluation (1 min)
+### Slide 6 : Données, banc d'évaluation et modèle serveur (1 min 45)
 
 - **Titre** : « Chaque décision repose sur une mesure »
-- **Visuel** : une frise horizontale en 4 cases : Génération (SymPy) → Entraînement → Évaluation (jeu figé) → Registry
-  MLflow. Sous chaque case, un chiffre :
-  - Génération : **15 000** problèmes, **0** fuite avec l'éval
-  - Entraînement : **11 793** codes + **8 567** explications vérifiées
-  - Évaluation : **250** problèmes figés, 5 types × 3 difficultés
-  - Registry : **5** modèles avec leur lignée · **122** runs
-- **À dire** : toutes les données sont générées et vérifiées par SymPy ; un seul banc note tous les modèles (y compris
-  ceux du téléphone vus plus haut) ; chaque modèle du registry connaît son parent et le hash de ses données.
-- **Option** : une petite capture de la liste des runs MLflow en fond.
-
-### Slide 8 : Modèle serveur, QLoRA et distillation (1 min)
-
-- **Titre** : « Même justesse, 8 fois plus rapide »
-- **Graphique** : barres verticales, latence p50 en secondes.
+- **Mise en page** : en haut, une frise de 4 cases ; en bas, un panneau avec le résultat sur le modèle serveur.
+- **Frise** : Générer (SymPy) → Entraîner → Évaluer (jeu figé) → Enregistrer (MLflow). Un chiffre par case :
+  - Générer : **15 000** problèmes vérifiés, 0 fuite avec l'éval
+  - Entraîner : **11 793** paires problème → code + 8 567 explications vérifiées
+  - Évaluer : **250** problèmes figés, 5 types × 3 difficultés, le même banc pour tous les modèles
+  - Enregistrer : **122 runs**, 5 modèles au registry avec parent et SHA-256 des données
+- **Panneau du bas, à gauche** : barres verticales, latence p50 sur le banc.
 
   | Modèle | Latence | Couleur |
   |---|---|---|
   | 7B brut | 3,49 s | gris |
-  | 7B + QLoRA (teacher-ft) | 1,40 s | couleur principale |
+  | 7B + QLoRA (teacher-ft), **en production** | 1,40 s | couleur principale |
   | 1,5B brut | 1,23 s | gris |
-  | 1,5B distillé | **0,43 s** | couleur principale, mise en avant |
+  | 1,5B distillé, **candidat** | **0,43 s** | couleur principale, mise en avant |
 
-- **Sous le graphique** : « Justesse 99,6 % → 100 % · jetons générés 314 → 82 »
-- **À dire** : c'est l'étape « Calcul » de la slide de contexte, côté serveur. Tous les modèles étaient déjà entre 98
-  et 100 % ; le gain se lit sur la vitesse. Le QLoRA (67 min, 10,9 Go de VRAM) apprend le format : du code direct, sans
-  phrases autour. Le 1,5B distillé depuis ce 7B fait 100 % en 0,43 s.
+- **Panneau du bas, à droite** : **100 %** de résultats justes (99,6 % pour le 7B brut) · 314 → 82 jetons par réponse ·
+  QLoRA en 67 min et 10,9 Go de VRAM.
+- **À dire** :
+  - Toutes les données sont générées et vérifiées par SymPy ; un seul banc note tous les modèles, y compris ceux du
+    téléphone vus avant ; chaque modèle du registry connaît son parent et le hash de ses données.
+  - Exemple sur le modèle serveur (l'étape « Calcul ») : tous étaient déjà entre 98 et 100 %, donc le banc a départagé
+    sur la vitesse. Le QLoRA apprend le format (du code direct, sans phrases autour) : 2,5 fois plus rapide, et c'est
+    lui qui tourne en production. Le 1,5B distillé depuis ce 7B fait 100 % en 0,43 s : c'est notre candidat suivant.
 
-### Slide 9 : De la commande unique au déploiement continu (1 min 15)
+### Slide 7 : Déployer, tester, surveiller (2 min 30)
 
-- **Titre** : « Une commande pour lancer, un push pour déployer »
-- **Visuel** : pipeline horizontal en 5 cases :
-  `git push` → CI GitHub (ruff, 63 pytest, 115 Jest, image Docker) → runner sur la VM → déploiement + vérification →
-  ✅ en ligne / ↩️ retour au commit précédent
-- **Sous le pipeline, 3 pictos** :
-  - 🖥️ VM créée par OpenTofu en ~2 min (`make vm-up`)
-  - 🔑 jeton par utilisateur, stocké haché, usage suivi
-  - 📦 `make up` : 10 conteneurs
-- **À dire** : en local, une commande lance tout, modèles compris (servis depuis le registry). La VM est décrite en
-  OpenTofu ; chaque push qui passe la CI y est déployé et vérifié par une vraie résolution, sinon retour arrière, et
-  on l'a vu fonctionner en vrai.
+- **Titre** : « Un push pour déployer, puis on teste et on surveille »
+- **Mise en page** : trois panneaux côte à côte, puis un bandeau bleu en bas.
+- **Panneau 1, « Déployer »** : pipeline vertical : `git push` → CI GitHub (ruff, 63 pytest, 115 Jest, image Docker) →
+  VM créée par OpenTofu (~2 min, `make vm-up`, runner GitHub dessus) → déploiement + vérification par une vraie
+  résolution, sinon retour au commit précédent.
+- **Panneau 2, « Tester la charge »** : en gros « **13,3 s → 1,7 s** à 64 utilisateurs », puis les courbes de latence p95
+  de `/v1/solve` selon le nombre d'utilisateurs (avant en orange, après en bleu).
 
-### Slide 10 : Test de charge (1 min)
+  | Utilisateurs | Avant correction | Après correction |
+  |---|---|---|
+  | 16 | 1,6 s | – |
+  | 32 | 3,1 s | 1,6 s |
+  | 64 | **13,3 s** | **1,7 s** |
+  | 128 | 27,6 s | 3,1 s |
 
-- **Titre** : « 64 utilisateurs simultanés : de 13 s à 1,7 s »
-- **Graphique** : courbes, latence p95 de `/v1/solve` (s) en fonction du nombre d'utilisateurs (axe x en échelle log).
-
-  | Utilisateurs | Avant correction | Après correction | VM (faux LLM) |
-  |---|---|---|---|
-  | 16 | 1,6 s | – | 0,34 s |
-  | 32 | 3,1 s | 1,6 s | 0,42 s |
-  | 64 | **13,3 s** | **1,7 s** | 1,3 s |
-  | 128 | 27,6 s | 3,1 s | – |
-
-- **Annotation sur la courbe** : « bac à sable 2 → 8 cœurs + OCR serveur asynchrone »
-- **À dire** : Locust par paliers, résultats dans MLflow. Le test a trouvé deux goulots, corrigés ; débit à 64
-  utilisateurs : 5,9 → 16,6 req/s. Sur la VM : 0 échec sur 2 533 requêtes.
-
-### Slide 11 : MLflow, monitoring et dérive (1 min)
-
-- **Titre** : « On mesure en continu, et on revient sur nos décisions »
-- **Mise en page** : deux captures côte à côte, et une bande de chiffres en bas.
-  - À gauche : le registry MLflow, modèle `explainer-0.6b-gguf` avec l'alias `champion`
-  - À droite : le tableau Grafana (trafic, latence p95 par étape, usage par utilisateur)
-- **Bande en bas** : « Dérive (Evidently) : trafic normal **0/6** colonnes · trafic de limites seulement **6/6** »
-- **À dire** : le téléphone télécharge le modèle `champion` avec son SHA-256 : changer de modèle revient à déplacer un
-  alias, sans nouvelle version de l'app. C'est le lien entre les deux sujets. Exemple réel : la version prunée a été
-  dé-promue après l'éval sur les 3 niveaux.
+  Dessous : correctifs (bac à sable 2 → 8 cœurs, OCR serveur asynchrone), débit 5,9 → 16,6 req/s, VM : 0 échec sur
+  2 533 requêtes.
+- **Panneau 3, « Surveiller »** : une capture Grafana, puis dérive Evidently **0/6** colonnes en trafic normal contre
+  **6/6** en trafic de limites seulement, puis une ligne sur l'alias `champion`.
+- **Bandeau en bas** : « En local : `make up` lance les 10 conteneurs, modèles servis depuis le registry · accès par
+  jeton haché, usage suivi par utilisateur »
+- **À dire** :
+  - En local, une commande lance tout (niveau 0). La VM est décrite en OpenTofu ; chaque push qui passe la CI y est
+    déployé et vérifié par une vraie résolution, sinon retour arrière, et on l'a vu fonctionner en vrai.
+  - Le test de charge (Locust par paliers, résultats dans MLflow) a trouvé deux goulots, qu'on a corrigés.
+  - On surveille en continu : Grafana pour le trafic et la latence, Evidently pour la dérive des formules reçues.
+  - Le téléphone télécharge le modèle `champion` avec son SHA-256 : changer de modèle revient à déplacer un alias,
+    sans nouvelle version de l'app. C'est le lien entre les deux sujets. Exemple réel : la version prunée a été
+    dé-promue après l'éval sur les 3 niveaux.
 
 ---
 
 ## Partie 4 : Bilan
 
-### Slide 12 : Bilan et limites (1 min)
+### Slide 8 : Bilan et limites (1 min)
 
 - **Titre** : « Bilan »
 - **Mise en page** : deux colonnes de cases cochées, un mot par critère, puis 3 limites en bas.
@@ -238,8 +228,7 @@ parce que tout le reste (registry, champion, déploiement) s'appuie dessus.
 | Élément | Comment | Slides |
 |---|---|---|
 | Capture de l'écran Solution | Sur le téléphone, `-3x²+23x-30=0` imprimé ou à l'écran | 1, 3 |
-| Liste des runs MLflow | `make infra-up`, puis http://localhost:5000, expérience `mathapp-weekend` | 7 |
-| Registry MLflow | http://localhost:5000 → Models → `explainer-0.6b-gguf` | 11 |
-| Tableau Grafana | `make up`, `make load-test USERS="8" DURATION=60` pour avoir du trafic, puis http://localhost:3000 | 11 |
-| Vidéo de démo | Enregistrement d'écran du téléphone : photo → lecture → solution → explication → graphe | 12 |
-| Graphiques | Faits à partir des tableaux ci-dessus (slides 4, 5, 6, 8, 10) | |
+| Tableau Grafana | `make up`, `make load-test USERS="8" DURATION=60` pour avoir du trafic, puis http://localhost:3000 | 7 |
+| Registry MLflow (pour les questions) | http://localhost:5000 → Models → `explainer-0.6b-gguf`, alias `champion` | 7 |
+| Vidéo de démo | Enregistrement d'écran du téléphone : photo → lecture → solution → explication → graphe | 8 |
+| Graphiques | Faits à partir des tableaux ci-dessus (slides 4, 5, 6, 7) | |
